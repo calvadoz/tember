@@ -1,11 +1,12 @@
 # Default Data
 
-ShellTrack seeds Debbie and Jake once when a browser first opens database version 2. Existing unrelated records remain in place. The seed marker remains when the user deletes all pet data, so deleted defaults do not return.
+Tember seeds the supplied backup once when a browser first opens a new local database. Existing unrelated records remain in place. A one-time additive upgrade gives existing Debbie and Jake seed databases the missing supplied records and Mochi without overwriting any local record. The seed marker remains when the user deletes all pet data, so deleted defaults do not return.
 
 ## Pet details
 
 - Debbie is a male leopard tortoise estimated to be 1.5 years old at her first measurement on 2023-02-18.
 - Jake is a male leopard tortoise estimated to be 1 year old at his first measurement on 2023-03-06.
+- Mochi is a female cat with a birth date of 2026-03-01 and an estimated age of 0.4 years at the first measurement.
 
 The displayed estimated age uses the latest measurement date:
 
@@ -16,11 +17,8 @@ age at latest record = age at first measurement
 
 Future measurements therefore update the estimate without changing the stored baseline age.
 
-## Source normalization
+## Source
 
-- Whole-number weights are grams. Decimal weights are kilograms converted to grams by multiplying by 1,000.
-- Debbie's out-of-sequence dates were normalized to 2024-02-18, 2024-06-02, 2024-10-07, 2025-03-17, 2025-04-06, and 2025-06-01.
-- Jake's out-of-sequence dates were normalized to 2024-02-18, 2025-01-07, 2025-02-02, 2025-04-06, 2025-04-27, 2025-06-01, 2025-07-20, and 2025-08-18.
-- Unusual but valid weight changes remain exactly as supplied.
+The seed is the supplied Tember backup with 310 measurements: 148 for Debbie, 146 for Jake, and 16 for Mochi. It preserves the backup's stored gram values, calendar dates, notes, and duplicate same-day Mochi records. Mochi is labelled as a cat in the seed to match the supplied pet context.
 
-The seed contains 139 Debbie measurements and 137 Jake measurements.
+The included portraits for Debbie, Jake, and Mochi are polished square crops of their supplied photos. A photo selected in the pet form is stored locally and takes precedence over the included portrait.

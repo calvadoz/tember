@@ -1,0 +1,81 @@
+import "server-only";
+
+import type { Measurement, Pet } from "@/lib/domain";
+import type { SyncSnapshot, Tombstone } from "@/lib/sync/types";
+import { ensureRemoteSchema } from "@/lib/sync/turso";
+
+function isIso(value: unknown): value is string {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function isValidTombstone(value: unknown): value is Tombstone {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.entityId === "string" &&
+    (item.entityType === "pet" || item.entityType === "measurement") &&
+    isIso(item.deletedAt)
+  );
+}
+
+function isRecordWithDates(value: unknown): value is Pet | Measurement {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.id === "string" && isIso(item.createdAt) && isIso(item.updatedAt);
+}
+
+export function parseSnapshot(value: unknown): SyncSnapshot | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const snapshot = value as Partial<SyncSnapshot>;
+  if (!Array.isArray(snapshot.pets) || !Array.isArray(snapshot.measurements) || !Array.isArray(snapshot.tombstones)) return undefined;
+  if (!snapshot.pets.every(isRecordWithDates) || !snapshot.measurements.every(isRecordWithDates) || !snapshot.tombstones.every(isValidTombstone)) return undefined;
+  return snapshot as SyncSnapshot;
+}
+
+async function upsertRecords(accountId: string, table: "pets" | "measurements", records: Array<Pet | Measurement>): Promise<void> {
+  const database = await ensureRemoteSchema();
+  for (const record of records) {
+    await database.execute({
+      sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, ?, ?, NULL) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at, deleted_at = NULL WHERE ${table}.account_id = excluded.account_id AND ${table}.updated_at < excluded.updated_at AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.updated_at)`,
+      args: [record.id, accountId, JSON.stringify(record), record.updatedAt],
+    });
+  }
+}
+
+async function applyTombstones(accountId: string, tombstones: Tombstone[]): Promise<void> {
+  const database = await ensureRemoteSchema();
+  for (const tombstone of tombstones) {
+    const table = tombstone.entityType === "pet" ? "pets" : "measurements";
+    await database.execute({
+      sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET deleted_at = excluded.deleted_at WHERE ${table}.account_id = excluded.account_id AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.deleted_at)`,
+      args: [tombstone.entityId, accountId, tombstone.deletedAt, tombstone.deletedAt],
+    });
+  }
+}
+
+export async function mergeSnapshot(accountId: string, snapshot: SyncSnapshot): Promise<SyncSnapshot> {
+  await upsertRecords(accountId, "pets", snapshot.pets);
+  await upsertRecords(accountId, "measurements", snapshot.measurements);
+  await applyTombstones(accountId, snapshot.tombstones);
+  return getSnapshot(accountId);
+}
+
+export async function getSnapshot(accountId: string): Promise<SyncSnapshot> {
+  const database = await ensureRemoteSchema();
+  const [pets, measurements] = await Promise.all([
+    database.execute({ sql: "SELECT payload, deleted_at FROM pets WHERE account_id = ?", args: [accountId] }),
+    database.execute({ sql: "SELECT payload, deleted_at FROM measurements WHERE account_id = ?", args: [accountId] }),
+  ]);
+  const toSnapshot = <T extends Pet | Measurement>(rows: typeof pets.rows) => rows.flatMap((row) => {
+    if (row.deleted_at || typeof row.payload !== "string") return [];
+    try { return [JSON.parse(row.payload) as T]; } catch { return []; }
+  });
+  const toTombstones = (rows: typeof pets.rows, entityType: Tombstone["entityType"]) => rows.flatMap((row) =>
+    typeof row.deleted_at === "string" ? [{ entityId: String(row.id), entityType, deletedAt: row.deleted_at }] : [],
+  );
+  return {
+    pets: toSnapshot<Pet>(pets.rows),
+    measurements: toSnapshot<Measurement>(measurements.rows),
+    tombstones: [...toTombstones(pets.rows, "pet"), ...toTombstones(measurements.rows, "measurement")],
+  };
+}

@@ -177,3 +177,4 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+.vercel

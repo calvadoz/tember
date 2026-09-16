@@ -27,6 +27,19 @@ export type Messages = {
     footer: string;
   };
   nav: { pets: string; data: string; localStatus: string };
+  sync: {
+    setupEyebrow: string;
+    setupHeading: string;
+    setupBody: string;
+    signInHeading: string;
+    username: string;
+    password: string;
+    passwordHelp: string;
+    createAccount: string;
+    signIn: string;
+    syncReady: string;
+    syncError: string;
+  };
   dashboard: {
     eyebrow: string;
     heading: string;
@@ -43,6 +56,13 @@ export type Messages = {
     editHeading: string;
     name: string;
     species: string;
+    photo: string;
+    addPhoto: string;
+    replacePhoto: string;
+    removePhoto: string;
+    photoPreview: string;
+    photoHelp: string;
+    photoError: string;
     sex: string;
     birthDate: string;
     estimatedAge: string;
@@ -62,6 +82,9 @@ export type Messages = {
     chartDescription: string;
     chartLegendRecorded: string;
     chartLegendDrop: string;
+    chartRangeLabel: string;
+    chartRanges: Record<"all" | "year" | "sixMonths" | "threeMonths", string>;
+    chartSelected: string;
     chartDateAxis: string;
     chartWeightAxisGram: string;
     chartWeightAxisKilogram: string;

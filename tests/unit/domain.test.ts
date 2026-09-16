@@ -61,6 +61,27 @@ describe("domain rules", () => {
     expect(result.estimatedAgeYears).toBeUndefined();
   });
 
+  it("accepts common pet types alongside the original tortoise types", () => {
+    expect(
+      petDraftSchema.parse({
+        name: "Mochi",
+        species: "cat",
+        sex: "female",
+      }).species,
+    ).toBe("cat");
+  });
+
+  it("keeps an optional local pet portrait with the profile", () => {
+    expect(
+      petDraftSchema.parse({
+        name: "Mochi",
+        species: "cat",
+        sex: "female",
+        photoDataUrl: "data:image/png;base64,AA==",
+      }).photoDataUrl,
+    ).toBe("data:image/png;base64,AA==");
+  });
+
   it("converts display units to storage units", () => {
     expect(weightToGram(1.25, "kg")).toBe(1250);
     expect(lengthToMm(12.4, "cm")).toBe(124);

@@ -1,10 +1,10 @@
-# ShellTrack Contributor Guide
+# Tember Contributor Guide
 
 ## Product boundary
 
-ShellTrack is a pet growth tracker that keeps data on the user's device. Tortoises come first, but names and storage choices should still make sense for other pets.
+Tember is a pet growth tracker that keeps data on the user's device. Names, storage choices, and interface language should work for any pet.
 
-For Iteration 1, do not add authentication, Supabase, cloud storage, sync, billing, or SaaS features. Build only approved iteration scope.
+Cloud sync is an approved shared-household feature. Keep IndexedDB as the device cache, keep JSON backup/export available, and never expose database credentials to the browser. All Turso access must go through authenticated server routes.
 
 ## Important data rules
 

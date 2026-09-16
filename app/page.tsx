@@ -1,5 +1,5 @@
-import { ShellTrackApp } from "@/components/app/shelltrack-app";
+import { TemberApp } from "@/components/app/tember-app";
 
 export default function Home() {
-  return <ShellTrackApp />;
+  return <TemberApp />;
 }

@@ -4,19 +4,19 @@
 
 @layer base {
   :root {
-    --background: 43 37% 97%;
-    --foreground: 90 5% 10%;
+    --background: 45 45% 97%;
+    --foreground: 151 25% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 90 5% 10%;
-    --primary: 145 64% 6%;
+    --card-foreground: 151 25% 12%;
+    --primary: 151 54% 16%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 60 23% 31%;
-    --secondary-foreground: 61 24% 25%;
-    --muted: 42 18% 94%;
-    --muted-foreground: 120 4% 36%;
-    --accent: 55 53% 83%;
-    --accent-foreground: 72 85% 8%;
-    --border: 108 5% 80%;
+    --secondary: 155 32% 36%;
+    --secondary-foreground: 153 35% 24%;
+    --muted: 47 28% 93%;
+    --muted-foreground: 145 8% 36%;
+    --accent: 42 82% 84%;
+    --accent-foreground: 32 56% 19%;
+    --border: 128 10% 78%;
     --radius: 1rem;
   }
 
@@ -38,6 +38,10 @@
 
   body {
     @apply bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at 100% 0%, rgb(205 234 215 / 0.72), transparent 31rem),
+      radial-gradient(circle at 0% 42%, rgb(255 220 174 / 0.4), transparent 28rem);
+    background-attachment: fixed;
   }
 
   ::selection {
@@ -62,6 +66,27 @@
 }
 
 @layer utilities {
+  .tember-hero {
+    background:
+      radial-gradient(circle at 92% 12%, rgb(255 224 174 / 0.92), transparent 9rem),
+      linear-gradient(135deg, rgb(233 247 235), rgb(255 253 247));
+    border: 1px solid rgb(178 210 186 / 0.85);
+    box-shadow: 0 18px 46px rgb(20 75 48 / 0.1);
+  }
+
+  .tember-pet-card {
+    background:
+      radial-gradient(circle at 88% 9%, rgb(255 229 189 / 0.64), transparent 7rem),
+      rgb(255 255 255 / 0.92);
+    border-color: rgb(170 207 181 / 0.85);
+    box-shadow: 0 12px 32px rgb(20 75 48 / 0.08);
+  }
+
+  .tember-stat-card {
+    border-color: rgb(170 207 181 / 0.8);
+    box-shadow: 0 8px 24px rgb(20 75 48 / 0.06);
+  }
+
   .shell-pattern {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='84' viewBox='0 0 96 84'%3E%3Cpath d='M24 1 47 14v27L24 54 1 41V14L24 1Zm48 29 23 13v27L72 83 49 70V43l23-13Z' fill='none' stroke='%23c3c8c1' stroke-opacity='.22'/%3E%3C/svg%3E");
     mask-image: linear-gradient(to bottom right, black, transparent 72%);

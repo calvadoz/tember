@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { WeightChart } from "@/components/app/shelltrack-app";
+import { WeightChart } from "@/components/app/tember-app";
 import type { Measurement } from "@/lib/domain";
 import { getMessages } from "@/lib/i18n/messages";
 
@@ -47,6 +47,10 @@ describe("WeightChart", () => {
     expect(
       screen.getByText(messages.pet.chartWeightAxisKilogram),
     ).toBeVisible();
+    expect(
+      screen.getByRole("group", { name: messages.pet.chartRangeLabel }),
+    ).toBeVisible();
+    expect(screen.getByText(messages.pet.chartSelected)).toBeVisible();
     const explorer = screen.getByRole("slider", {
       name: messages.pet.chartExploreHint,
     });

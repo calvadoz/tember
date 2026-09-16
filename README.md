@@ -1,10 +1,10 @@
-# ShellTrack
+# Tember
 
-ShellTrack is a private pet growth tracker that keeps data on your device. It starts with tortoise care, with room to support other pets later.
+Tember is a private pet growth tracker for companion animals and tortoises. It keeps a fast local copy on each device and can securely sync one shared household account across devices.
 
 ## Current status
 
-Iteration 2 is a working local-first MVP. It saves pets and measurements in this browser, shows growth history, and supports JSON backups and measurement CSV export.
+The local-first MVP is complete. Shared-household Turso sync is being added while retaining offline access, JSON backups, and measurement CSV export.
 
 ## Stack
 
@@ -41,7 +41,8 @@ Playwright browsers may need to be installed once with `pnpm exec playwright ins
 
 ## Product rules
 
-- Iteration 2 keeps everything on the device. It does not include accounts, cloud storage, billing, or online services.
+- The shared household account uses a username and password. Turso credentials are stored only in Vercel environment variables and are never sent to the browser.
+- Each device retains its IndexedDB cache, so existing records remain available offline. JSON backup stays available as an independent export.
 - Measurement weight is required and stored internally in grams.
 - Shell length, width, and height are optional and stored internally in millimeters.
 - Calendar dates use `YYYY-MM-DD`, audit times use full ISO strings, and IDs are created on the device.

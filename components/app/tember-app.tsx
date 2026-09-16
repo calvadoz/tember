@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -10,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import Image from "next/image";
 import {
   ArrowLeft,
   ChevronDown,
@@ -38,6 +40,15 @@ import {
   updateMeasurement,
   updatePet,
 } from "@/lib/db";
+import {
+  createSharedAccount,
+  getSyncStatus,
+  pullLatestSync,
+  requestSync,
+  signInToSync,
+  syncNow,
+} from "@/lib/sync/client";
+import type { SyncStatus } from "@/lib/sync/types";
 import type {
   LengthUnit,
   Measurement,
@@ -118,6 +129,76 @@ function Field({
 const inputClass =
   "min-h-11 min-w-0 max-w-full w-full rounded-md border bg-white px-3 py-2 text-base font-normal text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15";
 
+const seededPetPortraits: Record<string, string> = {
+  "00000000-0000-4000-8000-000000000001": "/images/pets/debbie.png",
+  "00000000-0000-4000-8000-000000000002": "/images/pets/jake.png",
+  "59915277-c742-430c-aa98-09fe1b737b2b": "/images/pets/mochi.png",
+};
+
+function PetPortrait({
+  photoDataUrl,
+  petId,
+  size = "regular",
+}: {
+  photoDataUrl?: string;
+  petId?: string;
+  size?: "small" | "regular" | "large";
+}) {
+  const sizeClass = {
+    small: "size-11",
+    regular: "size-16",
+    large: "size-24",
+  }[size];
+
+  const source =
+    photoDataUrl ?? seededPetPortraits[petId ?? ""] ?? "/images/pet-portrait-placeholder.png";
+
+  return (
+    <div
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-[#d9ead6] shadow-[0_8px_22px_rgba(23,67,45,0.15)]",
+        sizeClass,
+      )}
+    >
+      <Image
+        alt={messages.pet.photoPreview}
+        className="object-cover"
+        fill
+        sizes={size === "large" ? "96px" : size === "regular" ? "64px" : "44px"}
+        src={source}
+        unoptimized={Boolean(photoDataUrl)}
+      />
+    </div>
+  );
+}
+
+function SexIdentifier({
+  sex,
+  className,
+  showUnknown = true,
+}: {
+  sex: PetSex;
+  className?: string;
+  showUnknown?: boolean;
+}) {
+  if (sex === "unknown") {
+    return showUnknown ? <span className={className}>{messages.sex.unknown}</span> : null;
+  }
+
+  const colorClass = sex === "female" ? "text-[#c45a7a]" : "text-[#3f78aa]";
+
+  return (
+    <span
+      aria-label={messages.sex[sex]}
+      className={cn("inline-flex", colorClass, className)}
+      title={messages.sex[sex]}
+    >
+      <span aria-hidden="true">{sex === "female" ? "♀" : "♂"}</span>
+      <span className="sr-only">{messages.sex[sex]}</span>
+    </span>
+  );
+}
+
 function Modal({
   title,
   children,
@@ -163,6 +244,24 @@ function Modal({
 function PetForm({ pet, onClose }: { pet?: Pet; onClose: () => void }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [photoDataUrl, setPhotoDataUrl] = useState(pet?.photoDataUrl);
+
+  function choosePhoto(file?: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 4_000_000) {
+      setError(messages.pet.photoError);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setPhotoDataUrl(reader.result);
+        setError("");
+      }
+    };
+    reader.onerror = () => setError(messages.pet.photoError);
+    reader.readAsDataURL(file);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -175,6 +274,7 @@ function PetForm({ pet, onClose }: { pet?: Pet; onClose: () => void }) {
       sex: String(data.get("sex")) as PetSex,
       birthDate: String(data.get("birthDate") || "") || undefined,
       estimatedAgeYears: optionalNumber(data.get("estimatedAgeYears")),
+      photoDataUrl,
       notes: String(data.get("notes") || "") || undefined,
     };
     try {
@@ -201,11 +301,46 @@ function PetForm({ pet, onClose }: { pet?: Pet; onClose: () => void }) {
             required
           />
         </Field>
+        <section className="rounded-lg border bg-gradient-to-br from-emerald-50 via-card to-amber-50/70 p-4">
+          <div className="flex items-center gap-4">
+            <PetPortrait photoDataUrl={photoDataUrl} petId={pet?.id} size="regular" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-primary">
+                {messages.pet.photo}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {messages.pet.photoHelp}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <label className="inline-flex min-h-10 cursor-pointer items-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90">
+                  <input
+                    accept="image/avif,image/gif,image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(event) => choosePhoto(event.target.files?.[0])}
+                    type="file"
+                  />
+                  {photoDataUrl
+                    ? messages.pet.replacePhoto
+                    : messages.pet.addPhoto}
+                </label>
+                {photoDataUrl ? (
+                  <Button
+                    onClick={() => setPhotoDataUrl(undefined)}
+                    type="button"
+                    variant="outline"
+                  >
+                    {messages.pet.removePhoto}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label={messages.pet.species}>
             <select
               className={inputClass}
-              defaultValue={pet?.species}
+              defaultValue={pet?.species ?? "other"}
               name="species"
             >
               {petSpecies.map((species) => (
@@ -576,21 +711,42 @@ function niceWeightTicks(values: number[], targetTickCount = 4): number[] {
   return ticks;
 }
 
+type ChartRange = "all" | "year" | "sixMonths" | "threeMonths";
+
+const chartRanges: ReadonlyArray<{ value: ChartRange; days?: number }> = [
+  { value: "all" },
+  { value: "year", days: 365 },
+  { value: "sixMonths", days: 183 },
+  { value: "threeMonths", days: 92 },
+];
+
 export function WeightChart({ measurements }: { measurements: Measurement[] }) {
-  const [activeIndex, setActiveIndex] = useState(
-    Math.max(measurements.length - 1, 0),
-  );
+  const [range, setRange] = useState<ChartRange>("all");
+  const [activeIndex, setActiveIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(680);
   const chartContainer = useRef<HTMLDivElement>(null);
   const chartSvg = useRef<SVGSVGElement>(null);
-  const ordered = [...measurements].sort((a, b) =>
-    a.measuredAt.localeCompare(b.measuredAt),
+  const ordered = useMemo(
+    () => [...measurements].sort((a, b) => a.measuredAt.localeCompare(b.measuredAt)),
+    [measurements],
   );
+  const visibleMeasurements = useMemo(() => {
+    const selectedRange = chartRanges.find((item) => item.value === range);
+    if (!selectedRange?.days || !ordered.length) return ordered;
+    const latest = Date.parse(
+      ordered[ordered.length - 1].measuredAt + "T00:00:00.000Z",
+    );
+    const earliest = latest - selectedRange.days * 24 * 60 * 60 * 1000;
+    const filtered = ordered.filter(
+      (measurement) =>
+        Date.parse(measurement.measuredAt + "T00:00:00.000Z") >= earliest,
+    );
+    return filtered.length >= 2 ? filtered : ordered;
+  }, [ordered, range]);
 
   useEffect(() => {
     const container = chartContainer.current;
     if (!container) return;
-
     const updateWidth = () => setContainerWidth(container.clientWidth);
     updateWidth();
     if (typeof ResizeObserver === "undefined") return;
@@ -600,39 +756,36 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
   }, []);
 
   useEffect(() => {
-    setActiveIndex(Math.max(measurements.length - 1, 0));
-  }, [measurements.length]);
+    setActiveIndex(Math.max(visibleMeasurements.length - 1, 0));
+  }, [range, visibleMeasurements.length]);
 
-  if (ordered.length < 2) return null;
+  if (visibleMeasurements.length < 2) return null;
 
   const chartWidth = Math.max(containerWidth, 320);
-  const chartHeight = 320;
+  const chartHeight = chartWidth < 480 ? 278 : 310;
   const margin = {
-    top: 24,
+    top: 18,
     right: chartWidth < 480 ? 16 : 28,
-    bottom: 62,
+    bottom: 54,
     left: chartWidth < 480 ? 58 : 76,
   };
   const plotWidth = chartWidth - margin.left - margin.right;
   const plotHeight = chartHeight - margin.top - margin.bottom;
-  const weights = ordered.map((item) => item.weightGram);
+  const weights = visibleMeasurements.map((item) => item.weightGram);
   const yTicks = niceWeightTicks(weights);
   const yMinimum = yTicks[0];
   const yMaximum = yTicks[yTicks.length - 1];
   const yRange = yMaximum - yMinimum || 1;
-  const dateValues = ordered.map((item) =>
-    Date.parse(`${item.measuredAt}T00:00:00.000Z`),
+  const dateValues = visibleMeasurements.map((item) =>
+    Date.parse(item.measuredAt + "T00:00:00.000Z"),
   );
   const dateMinimum = dateValues[0];
   const dateRange = dateValues[dateValues.length - 1] - dateMinimum || 1;
   const weightUnit = yMaximum >= 1000 ? "kg" : "g";
-  const points = ordered.map((measurement, index) => {
-    const x =
-      margin.left + ((dateValues[index] - dateMinimum) / dateRange) * plotWidth;
-    const y =
-      margin.top +
-      (1 - (measurement.weightGram - yMinimum) / yRange) * plotHeight;
-    const previous = ordered[index - 1];
+  const points = visibleMeasurements.map((measurement, index) => {
+    const x = margin.left + ((dateValues[index] - dateMinimum) / dateRange) * plotWidth;
+    const y = margin.top + (1 - (measurement.weightGram - yMinimum) / yRange) * plotHeight;
+    const previous = visibleMeasurements[index - 1];
     return {
       measurement,
       x,
@@ -646,65 +799,58 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
     };
   });
   const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .map((point, index) => (index === 0 ? "M " : "L ") + point.x + " " + point.y)
     .join(" ");
   const baseline = margin.top + plotHeight;
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${baseline} L ${points[0].x} ${baseline} Z`;
-  const labelCount = chartWidth < 480 ? 3 : 5;
+  const areaPath =
+    linePath +
+    " L " +
+    points[points.length - 1].x +
+    " " +
+    baseline +
+    " L " +
+    points[0].x +
+    " " +
+    baseline +
+    " Z";
+  const labelCount = chartWidth < 480 ? 3 : 4;
   const dateLabelIndexes = Array.from(
     new Set(
       Array.from({ length: labelCount }, (_, index) =>
-        Math.round((index * (ordered.length - 1)) / (labelCount - 1)),
+        Math.round((index * (visibleMeasurements.length - 1)) / (labelCount - 1)),
       ),
     ),
   );
-  const markerCount = chartWidth < 480 ? 7 : 12;
-  const markerIndexes = new Set(
-    Array.from({ length: markerCount }, (_, index) =>
-      Math.round((index * (ordered.length - 1)) / (markerCount - 1)),
-    ),
-  );
+  const markerIndexes = new Set([0, points.length - 1]);
   points.forEach((point, index) => {
     if (point.significantDrop) markerIndexes.add(index);
   });
-  const activePoint = points[activeIndex];
+  const activePoint = points[Math.min(activeIndex, points.length - 1)];
   const tooltipWidth = 142;
-  const tooltipHeight = activePoint?.significantDrop ? 62 : 48;
-  const tooltipX = activePoint
-    ? Math.min(
-        chartWidth - margin.right - tooltipWidth,
-        Math.max(margin.left, activePoint.x - tooltipWidth / 2),
-      )
-    : 0;
-  const tooltipY = activePoint
-    ? activePoint.y - tooltipHeight - 12 >= margin.top
+  const tooltipHeight = activePoint.significantDrop ? 62 : 48;
+  const tooltipX = Math.min(
+    chartWidth - margin.right - tooltipWidth,
+    Math.max(margin.left, activePoint.x - tooltipWidth / 2),
+  );
+  const tooltipY =
+    activePoint.y - tooltipHeight - 12 >= margin.top
       ? activePoint.y - tooltipHeight - 12
-      : activePoint.y + 12
-    : 0;
+      : activePoint.y + 12;
 
   function selectNearestRecord(clientX: number) {
     const svg = chartSvg.current;
     if (!svg) return;
     const bounds = svg.getBoundingClientRect();
     const svgX = ((clientX - bounds.left) / bounds.width) * chartWidth;
-    const targetX = Math.min(
-      chartWidth - margin.right,
-      Math.max(margin.left, svgX),
+    const targetX = Math.min(chartWidth - margin.right, Math.max(margin.left, svgX));
+    const nearest = points.reduce(
+      (closest, point, index) =>
+        Math.abs(point.x - targetX) < closest.distance
+          ? { index, distance: Math.abs(point.x - targetX) }
+          : closest,
+      { index: 0, distance: Number.POSITIVE_INFINITY },
     );
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    points.forEach((point, index) => {
-      const distance = Math.abs(point.x - targetX);
-      if (distance < nearestDistance) {
-        nearestIndex = index;
-        nearestDistance = distance;
-      }
-    });
-    setActiveIndex(nearestIndex);
-  }
-
-  function handleChartPointer(event: PointerEvent<SVGRectElement>) {
-    selectNearestRecord(event.clientX);
+    setActiveIndex(nearest.index);
   }
 
   function handleChartKeyDown(event: KeyboardEvent<SVGRectElement>) {
@@ -725,7 +871,7 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border bg-card shadow-ambient">
+    <section className="min-w-0 overflow-hidden rounded-lg border bg-card shadow-ambient">
       <div className="p-5 sm:p-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
@@ -747,7 +893,40 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
             </span>
           </div>
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">
+        <div
+          aria-label={messages.pet.chartRangeLabel}
+          className="mt-5 flex flex-wrap gap-2"
+          role="group"
+        >
+          {chartRanges.map(({ value }) => (
+            <Button
+              className="h-9 px-3 text-xs"
+              key={value}
+              onClick={() => setRange(value)}
+              type="button"
+              variant={range === value ? "default" : "outline"}
+            >
+              {messages.pet.chartRanges[value]}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-1 rounded-md bg-muted/55 px-3 py-2 text-sm sm:grid-cols-[auto_1fr] sm:items-center sm:gap-3">
+          <span className="font-semibold text-primary">
+            {messages.pet.chartSelected}
+          </span>
+          <span className="min-w-0 text-muted-foreground">
+            {formatCalendarDate(activePoint.measurement.measuredAt)} ·{" "}
+            {formatWeight(activePoint.measurement.weightGram, "g")}
+            {activePoint.significantDrop
+              ? " (" +
+                formatNumber(activePoint.changePercent, {
+                  maximumFractionDigits: 1,
+                }) +
+                "%)"
+              : ""}
+          </span>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
           {messages.pet.chartExploreHint}
         </p>
       </div>
@@ -758,71 +937,39 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
       >
         <svg
           aria-label={messages.pet.chart}
-          className="block h-80 w-full touch-none select-none"
+          className="block h-[278px] w-full touch-none select-none sm:h-[310px]"
           ref={chartSvg}
           role="group"
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          viewBox={"0 0 " + chartWidth + " " + chartHeight}
         >
           <defs>
             <linearGradient id="weightArea" x1="0" x2="0" y1="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor="hsl(var(--secondary))"
-                stopOpacity="0.22"
-              />
-              <stop
-                offset="100%"
-                stopColor="hsl(var(--secondary))"
-                stopOpacity="0.02"
-              />
+              <stop offset="0%" stopColor="hsl(var(--secondary))" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="hsl(var(--secondary))" stopOpacity="0.02" />
             </linearGradient>
           </defs>
-
           {yTicks.map((tick) => {
-            const y =
-              margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
+            const y = margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
             return (
-              <line
-                className="stroke-border/70"
-                key={tick}
-                strokeDasharray="3 5"
-                x1={margin.left}
-                x2={chartWidth - margin.right}
-                y1={y}
-                y2={y}
-              />
+              <line className="stroke-border/70" key={tick} strokeDasharray="3 5" x1={margin.left} x2={chartWidth - margin.right} y1={y} y2={y} />
             );
           })}
-
           {dateLabelIndexes.map((index) => {
             const point = points[index];
             return (
               <g key={point.measurement.id}>
-                <line
-                  className="stroke-border/50"
-                  x1={point.x}
-                  x2={point.x}
-                  y1={baseline}
-                  y2={baseline + 5}
-                />
+                <line className="stroke-border/50" x1={point.x} x2={point.x} y1={baseline} y2={baseline + 5} />
                 <text
                   className="fill-muted-foreground text-[11px]"
-                  textAnchor={
-                    index === 0
-                      ? "start"
-                      : index === ordered.length - 1
-                        ? "end"
-                        : "middle"
-                  }
+                  textAnchor={index === 0 ? "start" : index === visibleMeasurements.length - 1 ? "end" : "middle"}
                   x={point.x}
-                  y={baseline + 23}
+                  y={baseline + 21}
                 >
                   {formatChartDate(point.measurement.measuredAt)}
                 </text>
               </g>
             );
           })}
-
           <text
             className="fill-muted-foreground text-[11px] font-semibold"
             textAnchor="middle"
@@ -832,41 +979,17 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
             {messages.pet.chartDateAxis}
           </text>
           <path className="chart-area" d={areaPath} fill="url(#weightArea)" />
-          <path
-            className="chart-line fill-none stroke-primary"
-            d={linePath}
-            pathLength="1"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2.5"
-          />
-
+          <path className="chart-line fill-none stroke-primary" d={linePath} pathLength="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
           {points.map((point, index) => {
             if (!point.significantDrop || index === 0) return null;
             const previous = points[index - 1];
-            return (
-              <line
-                className="chart-line stroke-red-700"
-                key={`drop-${point.measurement.id}`}
-                pathLength="1"
-                strokeLinecap="round"
-                strokeWidth="3.5"
-                x1={previous.x}
-                x2={point.x}
-                y1={previous.y}
-                y2={point.y}
-              />
-            );
+            return <line className="chart-line stroke-red-700" key={"drop-" + point.measurement.id} pathLength="1" strokeLinecap="round" strokeWidth="3.5" x1={previous.x} x2={point.x} y1={previous.y} y2={point.y} />;
           })}
-
           {points.map((point, index) =>
             markerIndexes.has(index) ? (
               <circle
                 aria-hidden="true"
-                className={cn(
-                  "chart-point pointer-events-none stroke-card stroke-2",
-                  point.significantDrop ? "fill-red-700" : "fill-primary",
-                )}
+                className={cn("chart-point pointer-events-none stroke-card stroke-2", point.significantDrop ? "fill-red-700" : "fill-primary")}
                 cx={point.x}
                 cy={point.y}
                 key={point.measurement.id}
@@ -874,106 +997,55 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
               />
             ) : null,
           )}
-
           <rect
             aria-label={messages.pet.chartExploreHint}
             aria-valuemax={points.length}
             aria-valuemin={1}
             aria-valuenow={activeIndex + 1}
-            aria-valuetext={`${formatCalendarDate(activePoint.measurement.measuredAt)}, ${formatWeight(activePoint.measurement.weightGram, "g")}`}
+            aria-valuetext={formatCalendarDate(activePoint.measurement.measuredAt) + ", " + formatWeight(activePoint.measurement.weightGram, "g")}
             className="cursor-crosshair fill-transparent outline-none focus:stroke-primary/35"
             height={plotHeight}
             onKeyDown={handleChartKeyDown}
-            onPointerDown={handleChartPointer}
-            onPointerMove={handleChartPointer}
+            onPointerDown={(event) => selectNearestRecord(event.clientX)}
+            onPointerMove={(event) => selectNearestRecord(event.clientX)}
             role="slider"
             tabIndex={0}
             width={plotWidth}
             x={margin.left}
             y={margin.top}
           />
-
-          <line
-            aria-hidden="true"
-            className="pointer-events-none stroke-secondary/45"
-            strokeDasharray="3 4"
-            x1={activePoint.x}
-            x2={activePoint.x}
-            y1={margin.top}
-            y2={baseline}
-          />
+          <line aria-hidden="true" className="pointer-events-none stroke-secondary/45" strokeDasharray="3 4" x1={activePoint.x} x2={activePoint.x} y1={margin.top} y2={baseline} />
           <circle
             aria-hidden="true"
-            className={cn(
-              "pointer-events-none stroke-card stroke-[3]",
-              activePoint.significantDrop ? "fill-red-700" : "fill-primary",
-            )}
+            className={cn("pointer-events-none stroke-card stroke-[3]", activePoint.significantDrop ? "fill-red-700" : "fill-primary")}
             cx={activePoint.x}
             cy={activePoint.y}
             r="6"
           />
-
-          {activePoint ? (
-            <g
-              className="pointer-events-none"
-              transform={`translate(${tooltipX} ${tooltipY})`}
-            >
-              <rect
-                fill="hsl(var(--primary))"
-                height={tooltipHeight}
-                rx="8"
-                width={tooltipWidth}
-              />
-              <text
-                fill="hsl(var(--primary-foreground))"
-                fontSize="11"
-                x="12"
-                y="19"
-              >
-                {formatCalendarDate(activePoint.measurement.measuredAt)}
+          <g className="pointer-events-none" transform={"translate(" + tooltipX + " " + tooltipY + ")"}>
+            <rect fill="hsl(var(--primary))" height={tooltipHeight} rx="8" width={tooltipWidth} />
+            <text fill="hsl(var(--primary-foreground))" fontSize="11" x="12" y="19">
+              {formatCalendarDate(activePoint.measurement.measuredAt)}
+            </text>
+            <text fill="hsl(var(--primary-foreground))" fontSize="13" fontWeight="700" x="12" y="38">
+              {formatWeight(activePoint.measurement.weightGram, "g")}
+            </text>
+            {activePoint.significantDrop ? (
+              <text fill="#fecaca" fontSize="11" fontWeight="600" x="12" y="54">
+                {formatNumber(activePoint.changePercent, { maximumFractionDigits: 1 })}%
               </text>
-              <text
-                fill="hsl(var(--primary-foreground))"
-                fontSize="13"
-                fontWeight="700"
-                x="12"
-                y="38"
-              >
-                {formatWeight(activePoint.measurement.weightGram, "g")}
-              </text>
-              {activePoint.significantDrop ? (
-                <text
-                  fill="#fecaca"
-                  fontSize="11"
-                  fontWeight="600"
-                  x="12"
-                  y="54"
-                >
-                  {formatNumber(activePoint.changePercent, {
-                    maximumFractionDigits: 1,
-                  })}
-                  %
-                </text>
-              ) : null}
-            </g>
-          ) : null}
+            ) : null}
+          </g>
         </svg>
         <svg
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-80 w-full"
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="pointer-events-none absolute inset-0 h-[278px] w-full sm:h-[310px]"
+          viewBox={"0 0 " + chartWidth + " " + chartHeight}
         >
           {yTicks.map((tick) => {
-            const y =
-              margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
+            const y = margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
             return (
-              <text
-                className="fill-muted-foreground text-[11px]"
-                key={tick}
-                textAnchor="end"
-                x={margin.left - 10}
-                y={y + 4}
-              >
+              <text className="fill-muted-foreground text-[11px]" key={tick} textAnchor="end" x={margin.left - 10} y={y + 4}>
                 {formatWeight(tick, weightUnit)}
               </text>
             );
@@ -981,13 +1053,11 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
           <text
             className="fill-muted-foreground text-[11px] font-semibold"
             textAnchor="middle"
-            transform={`rotate(-90 16 ${margin.top + plotHeight / 2})`}
+            transform={"rotate(-90 16 " + (margin.top + plotHeight / 2) + ")"}
             x={16}
             y={margin.top + plotHeight / 2}
           >
-            {weightUnit === "kg"
-              ? messages.pet.chartWeightAxisKilogram
-              : messages.pet.chartWeightAxisGram}
+            {weightUnit === "kg" ? messages.pet.chartWeightAxisKilogram : messages.pet.chartWeightAxisGram}
           </text>
         </svg>
       </div>
@@ -1054,17 +1124,20 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
           <ArrowLeft className="mr-2 size-4" />
           {messages.pet.back}
         </Button>
-        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
-          <div>
+        <header className="tember-hero flex flex-col justify-between gap-5 rounded-2xl p-5 sm:flex-row sm:items-start sm:p-7">
+          <div className="flex items-center gap-4">
+            <PetPortrait photoDataUrl={pet.photoDataUrl} petId={pet.id} size="regular" />
+            <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
               {messages.species[pet.species]}
             </p>
             <h1 className="mt-2 font-display text-4xl font-bold text-primary">
               {pet.name}
             </h1>
-            <p className="mt-2 text-muted-foreground">
-              {messages.sex[pet.sex]}
+            <p className="mt-2 text-2xl leading-none text-muted-foreground">
+              <SexIdentifier sex={pet.sex} />
             </p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setMeasurementEditor("new")}>
@@ -1088,8 +1161,8 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
           </div>
         </header>
         {latest ? (
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <article className="rounded-lg bg-primary p-6 text-primary-foreground sm:col-span-2">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <article className="rounded-2xl bg-gradient-to-br from-primary to-[#1f6b49] p-6 text-primary-foreground shadow-[0_16px_30px_rgba(21,73,46,0.18)] sm:col-span-2">
               <p className="text-sm opacity-75">{messages.pet.latestWeight}</p>
               <p className="mt-2 font-display text-4xl font-bold">
                 {formatWeight(latest.weightGram, "g")}
@@ -1098,7 +1171,7 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                 {formatCalendarDate(latest.measuredAt)}
               </p>
             </article>
-            <article className="rounded-lg border bg-card p-6">
+            <article className="tember-stat-card rounded-2xl border bg-card/90 p-6">
               <p className="text-sm text-muted-foreground">
                 {messages.dashboard.measurementCount}
               </p>
@@ -1106,7 +1179,7 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                 {formatNumber(measurements.length)}
               </p>
             </article>
-            <article className="rounded-lg border bg-card p-6">
+            <article className="tember-stat-card rounded-2xl border bg-card/90 p-6">
               <p className="text-sm text-muted-foreground">
                 {messages.pet.estimatedAgeLatest}
               </p>
@@ -1407,7 +1480,7 @@ function PetList({
   return (
     <main className="min-w-0 flex-1 px-5 pb-28 pt-8 sm:px-8 lg:pb-10 lg:pt-10">
       <div className="mx-auto max-w-5xl">
-        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <header className="tember-hero flex flex-col justify-between gap-5 rounded-2xl p-5 sm:flex-row sm:items-end sm:p-7">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
               {messages.dashboard.eyebrow}
@@ -1439,26 +1512,29 @@ function PetList({
             </div>
           </section>
         ) : pets.length ? (
-          <section className="mt-8 grid gap-5 md:grid-cols-2">
+          <section className="mt-6 grid gap-5 md:grid-cols-2">
             {pets.map((pet) => {
               const records = measurements
                 .filter((item) => item.petId === pet.id)
                 .sort((a, b) => b.measuredAt.localeCompare(a.measuredAt));
               return (
                 <article
-                  className="group rounded-lg border bg-card p-6 shadow-[0_2px_8px_rgba(27,48,34,0.04)] transition hover:-translate-y-0.5 hover:shadow-ambient motion-reduce:transform-none"
+                  className="tember-pet-card group rounded-2xl border p-6 transition hover:-translate-y-0.5 hover:shadow-ambient motion-reduce:transform-none"
                   key={pet.id}
                 >
-                  <div className="flex items-start justify-between">
-                    <span className="grid size-11 place-items-center rounded-md bg-accent text-accent-foreground">
-                      <Leaf className="size-5" />
-                    </span>
+                  <div className="flex items-start justify-between gap-4">
+                    <PetPortrait photoDataUrl={pet.photoDataUrl} petId={pet.id} />
                     <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {messages.species[pet.species]}
                     </span>
                   </div>
-                  <h2 className="mt-5 font-display text-2xl font-bold text-primary">
-                    {pet.name}
+                  <h2 className="mt-5 flex items-center gap-2 font-display text-2xl font-bold text-primary">
+                    <span>{pet.name}</span>
+                    <SexIdentifier
+                      className="font-sans text-xl leading-none"
+                      sex={pet.sex}
+                      showUnknown={false}
+                    />
                   </h2>
                   <div className="mt-5 grid grid-cols-2 gap-4 border-y py-4">
                     <div>
@@ -1522,7 +1598,7 @@ function DataView({ onImported }: { onImported: () => void }) {
     const value = await makeBackup();
     downloadFile(
       JSON.stringify(value, null, 2),
-      "shelltrack-backup.json",
+      "tember-backup.json",
       "application/json",
     );
   }
@@ -1533,7 +1609,7 @@ function DataView({ onImported }: { onImported: () => void }) {
     }
     downloadFile(
       measurementsToCsv(measurements),
-      "shelltrack-measurements.csv",
+      "tember-measurements.csv",
       "text/csv;charset=utf-8",
     );
   }
@@ -1552,17 +1628,19 @@ function DataView({ onImported }: { onImported: () => void }) {
   return (
     <main className="min-w-0 flex-1 px-5 pb-28 pt-8 sm:px-8 lg:pb-10 lg:pt-10">
       <div className="mx-auto max-w-4xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
-          {messages.data.eyebrow}
-        </p>
-        <h1 className="mt-2 font-display text-4xl font-bold text-primary">
-          {messages.data.heading}
-        </h1>
-        <p className="mt-3 text-muted-foreground">
-          {messages.data.introduction}
-        </p>
-        <div className="mt-8 grid gap-5 md:grid-cols-2">
-          <section className="rounded-lg border bg-card p-6 shadow-ambient">
+        <header className="tember-hero rounded-2xl p-5 sm:p-7">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+            {messages.data.eyebrow}
+          </p>
+          <h1 className="mt-2 font-display text-4xl font-bold text-primary">
+            {messages.data.heading}
+          </h1>
+          <p className="mt-3 text-muted-foreground">
+            {messages.data.introduction}
+          </p>
+        </header>
+        <div className="mt-6 grid gap-5 md:grid-cols-2">
+          <section className="tember-pet-card rounded-2xl border p-6">
             <Download className="size-7 text-secondary" />
             <h2 className="mt-5 font-display text-xl font-bold text-primary">
               {messages.data.exportHeading}
@@ -1577,7 +1655,7 @@ function DataView({ onImported }: { onImported: () => void }) {
               </Button>
             </div>
           </section>
-          <section className="rounded-lg border bg-card p-6 shadow-ambient">
+          <section className="tember-pet-card rounded-2xl border p-6">
             <Upload className="size-7 text-secondary" />
             <h2 className="mt-5 font-display text-xl font-bold text-primary">
               {messages.data.importHeading}
@@ -1602,6 +1680,7 @@ function DataView({ onImported }: { onImported: () => void }) {
                   onClick={async () => {
                     try {
                       await replaceWithBackup(backup);
+                      requestSync();
                       setBackup(undefined);
                       setStatus(messages.data.importSuccess);
                       onImported();
@@ -1658,10 +1737,93 @@ function DataView({ onImported }: { onImported: () => void }) {
   );
 }
 
-export function ShellTrackApp() {
+function SyncAccountScreen({
+  bootstrapNeeded,
+  onComplete,
+}: {
+  bootstrapNeeded: boolean;
+  onComplete: () => void;
+}) {
+  const [error, setError] = useState<string>();
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <main className="grid min-h-dvh place-items-center bg-background px-5 py-10">
+      <form
+        className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-ambient sm:p-8"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          setError(undefined);
+          setSaving(true);
+          try {
+            const username = String(data.get("username") ?? "");
+            const password = String(data.get("password") ?? "");
+            if (bootstrapNeeded) await createSharedAccount(username, password);
+            else await signInToSync(username, password);
+            await syncNow();
+            onComplete();
+          } catch (cause) {
+            setError(
+              cause instanceof Error ? cause.message : messages.sync.syncError,
+            );
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <ShellMark className="size-12 text-primary" />
+        <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+          {messages.sync.setupEyebrow}
+        </p>
+        <h1 className="mt-2 font-display text-3xl font-bold text-primary">
+          {bootstrapNeeded
+            ? messages.sync.setupHeading
+            : messages.sync.signInHeading}
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          {messages.sync.setupBody}
+        </p>
+        <div className="mt-7 grid gap-5">
+          <Field label={messages.sync.username}>
+            <input
+              autoComplete="username"
+              className={inputClass}
+              name="username"
+              required
+            />
+          </Field>
+          <Field label={messages.sync.password} hint={messages.sync.passwordHelp}>
+            <input
+              autoComplete={bootstrapNeeded ? "new-password" : "current-password"}
+              className={inputClass}
+              minLength={12}
+              name="password"
+              required
+              type="password"
+            />
+          </Field>
+        </div>
+        {error ? (
+          <p className="mt-5 text-sm font-medium text-red-800" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button className="mt-7 w-full" disabled={saving} type="submit">
+          {bootstrapNeeded
+            ? messages.sync.createAccount
+            : messages.sync.signIn}
+        </Button>
+      </form>
+    </main>
+  );
+}
+
+export function TemberApp() {
   const [view, setView] = useState<View>("pets");
   const [petId, setPetId] = useState<string>();
   const [storageReady, setStorageReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>();
   useEffect(() => {
     let active = true;
     void ensureDefaultData()
@@ -1673,6 +1835,69 @@ export function ShellTrackApp() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (!storageReady) return;
+    let active = true;
+    void getSyncStatus()
+      .then((status) => {
+        if (active) setSyncStatus(status);
+      })
+      .catch(() => {
+        if (active) {
+          setSyncStatus({
+            configured: false,
+            authenticated: false,
+            bootstrapNeeded: false,
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [storageReady]);
+  useEffect(() => {
+    if (!storageReady || !syncStatus?.authenticated) return;
+    let syncing = false;
+    const sync = () => {
+      if (syncing) return;
+      syncing = true;
+      void syncNow().finally(() => {
+        syncing = false;
+      });
+    };
+    const pullLatest = () => {
+      if (syncing || document.visibilityState !== "visible") return;
+      syncing = true;
+      void pullLatestSync().finally(() => {
+        syncing = false;
+      });
+    };
+    sync();
+    window.addEventListener("tember-local-change", sync);
+    window.addEventListener("online", sync);
+    document.addEventListener("visibilitychange", pullLatest);
+    const refreshInterval = window.setInterval(pullLatest, 30_000);
+    return () => {
+      window.removeEventListener("tember-local-change", sync);
+      window.removeEventListener("online", sync);
+      document.removeEventListener("visibilitychange", pullLatest);
+      window.clearInterval(refreshInterval);
+    };
+  }, [storageReady, syncStatus?.authenticated]);
+  if (storageReady && syncStatus?.configured && !syncStatus.authenticated) {
+    return (
+      <SyncAccountScreen
+        bootstrapNeeded={syncStatus.bootstrapNeeded}
+        onComplete={() =>
+          setSyncStatus((status) =>
+            status
+              ? { ...status, authenticated: true, bootstrapNeeded: false }
+              : status,
+          )
+        }
+      />
+    );
+  }
   return (
     <div className="min-h-dvh min-w-0 max-w-full overflow-x-clip lg:flex">
       <aside className="hidden w-64 shrink-0 flex-col bg-primary px-5 py-7 text-primary-foreground lg:flex">
@@ -1709,7 +1934,9 @@ export function ShellTrackApp() {
         </nav>
         <p className="mt-auto flex items-center gap-2 text-xs opacity-70">
           <ShieldCheck className="size-4" />
-          {messages.nav.localStatus}
+          {syncStatus?.authenticated
+            ? messages.sync.syncReady
+            : messages.nav.localStatus}
         </p>
       </aside>
       {petId ? (

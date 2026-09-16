@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-16
+
+### Changed
+
+- Reframed Tember’s interface as a private pet growth tracker, with generic optional measurements and common pet types while preserving the existing local storage, age calculation, measurements, import/export, and deletion behavior.
+- Rebuilt the weight chart for dense records: time-range controls, endpoint and significant-drop markers, labelled axes, a selected-record summary, and the existing touch and keyboard explorer now fit without horizontal scrolling.
+- Replaced the first-run seed with the supplied Debbie, Jake, and Mochi backup (310 measurements). New local databases receive it once; existing records are not replaced.
+- Added a one-time additive seed upgrade so existing Debbie and Jake installs receive Mochi and the missing supplied records without requiring a data reset or overwriting local entries.
+- Renamed the product to Tember, refreshed the forest-and-cream palette with brighter sage and coral-gold accents, and added optional local pet portraits with a replaceable default illustration.
+- Refined the core Pets, Pet Detail, and Data views with brighter layered hero surfaces, more expressive profile cards, and elevated growth summary cards while retaining the Montserrat and Inter type system.
+- Replaced the included illustration for Debbie, Jake, and Mochi with polished square portraits based on their supplied photos. A locally selected portrait still takes precedence.
+- Replaced male and female labels on pet profiles with the conventional, screen-reader-labelled female and male symbols. The clear words remain in the profile form.
+- Added a coloured sex symbol beside each known pet name in the Pets preview: rose for female and slate-blue for male.
+- Added shared-household sync with a server-only Turso connection, a first-device shared username-and-password setup, durable sessions, and local IndexedDB cache synchronization using stable IDs and deletion tombstones.
+- Made an open signed-in device refresh shared records every 30 seconds and whenever Tember returns to the foreground. Saving a local change still synchronizes immediately.
+
 ## 2026-06-22
 
 ### Changed
@@ -18,14 +34,14 @@
 - Responsive desktop and mobile navigation, pet dashboard, weight chart, and accessible measurement history.
 - Strict record validation and weight or length unit conversion at the interface boundary.
 - Versioned JSON backup and validated atomic import, plus measurement CSV export.
-- A confirmed Data-menu action that deletes all pets and measurements stored locally by ShellTrack without affecting downloaded backups.
+- A confirmed Data-menu action that deletes all pets and measurements stored locally by Tember without affecting downloaded backups.
 - One-time default profiles for Debbie and Jake with 276 supplied measurements, normalized gram storage, and documented source-date corrections.
 - Unit and storage coverage for weight-only measurements, missing optional dimensions, cascade deletion, conversion, and portable formats.
 - Initial Next.js App Router foundation with TypeScript, Tailwind CSS, shadcn/ui conventions, ESLint, Prettier, Vitest, and Playwright.
 - Responsive welcome page based on the supplied Stitch design.
 - Shared shell mark, favicon, and reduced-motion-aware route preloader.
 - Guides for contributors, design choices, data rules, planned iterations, and future Codex work.
-- A ShellTrack-only development skill with the project's product, writing, and localization rules.
+- A Tember-only development skill with the project's product, writing, and localization rules.
 - Shared English message files and locale-aware formatters for calendar dates, exact times, numbers, weight, and length.
 
 ### Changed

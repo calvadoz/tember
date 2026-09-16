@@ -7,15 +7,17 @@ import type {
   PetDraft,
 } from "@/lib/domain";
 import { defaultMeasurements, defaultPets } from "@/lib/db/default-data";
+import type { SyncSnapshot, Tombstone } from "@/lib/sync/types";
 import {
   measurementDraftSchema,
   petDraftSchema,
 } from "@/lib/validation/schemas";
 
-class ShellTrackDatabase extends Dexie {
+class TemberDatabase extends Dexie {
   pets!: EntityTable<Pet, "id">;
   measurements!: EntityTable<Measurement, "id">;
   appState!: EntityTable<{ key: string; value: string }, "key">;
+  tombstones!: EntityTable<Tombstone, "entityId">;
 
   constructor(name = "shelltrack") {
     super(name);
@@ -28,13 +30,21 @@ class ShellTrackDatabase extends Dexie {
       measurements: "id, petId, measuredAt, [petId+measuredAt]",
       appState: "key",
     });
+    this.version(3).stores({
+      pets: "id, name, species, updatedAt",
+      measurements: "id, petId, measuredAt, [petId+measuredAt]",
+      appState: "key",
+      tombstones: "entityId, entityType, deletedAt",
+    });
   }
 }
 
-export const db = new ShellTrackDatabase();
-export { ShellTrackDatabase };
+export const db = new TemberDatabase();
+export { TemberDatabase };
 
-const defaultDataStateKey = "default-data-v1";
+const legacyDefaultDataStateKey = "default-data-v1";
+const defaultDataStateKey = "default-data-v2";
+const legacyDefaultPetIds = defaultPets.slice(0, 2).map((pet) => pet.id);
 
 export async function ensureDefaultData(): Promise<void> {
   await db.transaction(
@@ -44,8 +54,41 @@ export async function ensureDefaultData(): Promise<void> {
     db.appState,
     async () => {
       if (await db.appState.get(defaultDataStateKey)) return;
-      await db.pets.bulkAdd(defaultPets);
-      await db.measurements.bulkAdd(defaultMeasurements);
+
+      const legacySeedApplied = await db.appState.get(
+        legacyDefaultDataStateKey,
+      );
+      const existingLegacyPets = await db.pets.bulkGet(legacyDefaultPetIds);
+      const canUpgradeLegacySeed =
+        Boolean(legacySeedApplied) && existingLegacyPets.every(Boolean);
+
+      if (!legacySeedApplied || canUpgradeLegacySeed) {
+        const existingPetIds = new Set(
+          (await db.pets.bulkGet(defaultPets.map((pet) => pet.id)))
+            .filter((pet): pet is Pet => Boolean(pet))
+            .map((pet) => pet.id),
+        );
+        const existingMeasurementIds = new Set(
+          (await db.measurements.bulkGet(defaultMeasurements.map((measurement) => measurement.id)))
+            .filter((measurement): measurement is Measurement =>
+              Boolean(measurement),
+            )
+            .map((measurement) => measurement.id),
+        );
+        await db.pets.bulkAdd(
+          defaultPets.filter((pet) => !existingPetIds.has(pet.id)),
+        );
+        await db.measurements.bulkAdd(
+          defaultMeasurements.filter(
+            (measurement) => !existingMeasurementIds.has(measurement.id),
+          ),
+        );
+      }
+
+      await db.appState.put({
+        key: legacyDefaultDataStateKey,
+        value: "complete",
+      });
       await db.appState.put({ key: defaultDataStateKey, value: "complete" });
     },
   );
@@ -53,6 +96,19 @@ export async function ensureDefaultData(): Promise<void> {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function notifyLocalChange(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("tember-local-change"));
+  }
+}
+
+async function rememberDeletion(entityId: string, entityType: Tombstone["entityType"], deletedAt = nowIso()): Promise<void> {
+  const existing = await db.tombstones.get(entityId);
+  if (!existing || existing.deletedAt < deletedAt) {
+    await db.tombstones.put({ entityId, entityType, deletedAt });
+  }
 }
 
 export async function createPet(draft: PetDraft): Promise<Pet> {
@@ -65,6 +121,7 @@ export async function createPet(draft: PetDraft): Promise<Pet> {
     updatedAt: timestamp,
   };
   await db.pets.add(pet);
+  notifyLocalChange();
   return pet;
 }
 
@@ -75,13 +132,19 @@ export async function updatePet(id: string, draft: PetDraft): Promise<void> {
     updatedAt: nowIso(),
   });
   if (!changed) throw new Error("Pet not found");
+  notifyLocalChange();
 }
 
 export async function deletePet(id: string): Promise<void> {
-  await db.transaction("rw", db.pets, db.measurements, async () => {
+  await db.transaction("rw", db.pets, db.measurements, db.tombstones, async () => {
+    const deletedAt = nowIso();
+    const measurements = await db.measurements.where("petId").equals(id).toArray();
+    await Promise.all(measurements.map((measurement) => rememberDeletion(measurement.id, "measurement", deletedAt)));
+    await rememberDeletion(id, "pet", deletedAt);
     await db.measurements.where("petId").equals(id).delete();
     await db.pets.delete(id);
   });
+  notifyLocalChange();
 }
 
 export async function createMeasurement(
@@ -97,6 +160,7 @@ export async function createMeasurement(
     updatedAt: timestamp,
   };
   await db.measurements.add(measurement);
+  notifyLocalChange();
   return measurement;
 }
 
@@ -111,15 +175,67 @@ export async function updateMeasurement(
     updatedAt: nowIso(),
   });
   if (!changed) throw new Error("Measurement not found");
+  notifyLocalChange();
 }
 
 export async function deleteMeasurement(id: string): Promise<void> {
+  await rememberDeletion(id, "measurement");
   await db.measurements.delete(id);
+  notifyLocalChange();
 }
 
 export async function clearAllLocalData(): Promise<void> {
-  await db.transaction("rw", db.pets, db.measurements, async () => {
+  await db.transaction("rw", db.pets, db.measurements, db.tombstones, async () => {
+    const deletedAt = nowIso();
+    const [pets, measurements] = await Promise.all([db.pets.toArray(), db.measurements.toArray()]);
+    await Promise.all([
+      ...pets.map((pet) => rememberDeletion(pet.id, "pet", deletedAt)),
+      ...measurements.map((measurement) => rememberDeletion(measurement.id, "measurement", deletedAt)),
+    ]);
     await db.measurements.clear();
     await db.pets.clear();
+  });
+  notifyLocalChange();
+}
+
+export async function getSyncSnapshot(): Promise<SyncSnapshot> {
+  const [pets, measurements, tombstones] = await Promise.all([
+    db.pets.toArray(),
+    db.measurements.toArray(),
+    db.tombstones.toArray(),
+  ]);
+  return { pets, measurements, tombstones };
+}
+
+export async function applyRemoteSnapshot(snapshot: SyncSnapshot): Promise<void> {
+  await db.transaction("rw", db.pets, db.measurements, db.tombstones, async () => {
+    const localTombstones = new Map((await db.tombstones.toArray()).map((item) => [item.entityId, item]));
+    for (const tombstone of snapshot.tombstones) {
+      const local = localTombstones.get(tombstone.entityId);
+      if (!local || local.deletedAt < tombstone.deletedAt) {
+        await db.tombstones.put(tombstone);
+        if (tombstone.entityType === "pet") {
+          await db.pets.delete(tombstone.entityId);
+          await db.measurements.where("petId").equals(tombstone.entityId).delete();
+        } else {
+          await db.measurements.delete(tombstone.entityId);
+        }
+      }
+    }
+
+    for (const pet of snapshot.pets) {
+      const tombstone = localTombstones.get(pet.id);
+      if (tombstone && tombstone.deletedAt >= pet.updatedAt) continue;
+      const existing = await db.pets.get(pet.id);
+      if (!existing || existing.updatedAt < pet.updatedAt) await db.pets.put(pet);
+      if (tombstone && tombstone.deletedAt < pet.updatedAt) await db.tombstones.delete(pet.id);
+    }
+    for (const measurement of snapshot.measurements) {
+      const tombstone = localTombstones.get(measurement.id);
+      if (tombstone && tombstone.deletedAt >= measurement.updatedAt) continue;
+      const existing = await db.measurements.get(measurement.id);
+      if (!existing || existing.updatedAt < measurement.updatedAt) await db.measurements.put(measurement);
+      if (tombstone && tombstone.deletedAt < measurement.updatedAt) await db.tombstones.delete(measurement.id);
+    }
   });
 }

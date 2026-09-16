@@ -17,6 +17,11 @@ const calendarDate = z
 
 const optionalText = z.string().trim().max(2000).optional();
 const optionalPositiveNumber = z.number().finite().positive().optional();
+const optionalPhotoDataUrl = z
+  .string()
+  .regex(/^data:image\/(avif|gif|jpeg|png|webp);base64,/, "Invalid image")
+  .max(6_000_000)
+  .optional();
 
 export const petDraftSchema = z
   .object({
@@ -25,6 +30,7 @@ export const petDraftSchema = z
     sex: z.enum(["male", "female", "unknown"]),
     birthDate: calendarDate.optional(),
     estimatedAgeYears: z.number().finite().nonnegative().max(500).optional(),
+    photoDataUrl: optionalPhotoDataUrl,
     notes: optionalText,
   })
   .strict();

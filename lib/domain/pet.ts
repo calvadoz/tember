@@ -1,4 +1,9 @@
 export const petSpecies = [
+  "cat",
+  "dog",
+  "rabbit",
+  "bird",
+  "fish",
   "hermanns-tortoise",
   "russian-tortoise",
   "greek-tortoise",
@@ -18,6 +23,7 @@ export type Pet = {
   sex: PetSex;
   birthDate?: string;
   estimatedAgeYears?: number;
+  photoDataUrl?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
