@@ -56,6 +56,6 @@ Each device uses IndexedDB through Dexie for immediate offline reads and writes.
 
 The first device creates one shared username-and-password account. The second device signs in to the same account. Turso credentials are environment variables available only to server routes. They are never sent to the browser.
 
-Updates use the latest `updatedAt` value for the same record. Deletes are retained as timestamped tombstones, so a deletion can be applied on another device. Concurrent changes to the same record resolve to the newer timestamp. A saving device syncs immediately; an open second device pulls updates every 30 seconds and when it returns to the foreground. JSON backup remains a separate portable copy.
+Updates use the latest `updatedAt` value for the same record. Deletes are retained as timestamped tombstones, so a deletion can be applied on another device. Concurrent changes to the same record resolve to the newer timestamp. The initial snapshot is written in one database transaction. A saving device syncs immediately; an open second device pulls updates every 30 seconds and when it returns to the foreground. JSON backup remains a separate portable copy.
 
 The local database receives the versioned default data described in `docs/default-data.md` once without removing existing records. Deleting all local pet data does not reset this marker or restore the defaults.

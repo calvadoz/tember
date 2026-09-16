@@ -1761,7 +1761,6 @@ function SyncAccountScreen({
             const password = String(data.get("password") ?? "");
             if (bootstrapNeeded) await createSharedAccount(username, password);
             else await signInToSync(username, password);
-            await syncNow();
             onComplete();
           } catch (cause) {
             setError(

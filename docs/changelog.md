@@ -15,6 +15,7 @@
 - Added a coloured sex symbol beside each known pet name in the Pets preview: rose for female and slate-blue for male.
 - Added shared-household sync with a server-only Turso connection, a first-device shared username-and-password setup, durable sessions, and local IndexedDB cache synchronization using stable IDs and deletion tombstones.
 - Made an open signed-in device refresh shared records every 30 seconds and whenever Tember returns to the foreground. Saving a local change still synchronizes immediately.
+- Made first-account setup responsive by completing it before the background upload, and batched initial and subsequent record writes into one Turso transaction instead of one remote request per record.
 
 ## 2026-06-22
 

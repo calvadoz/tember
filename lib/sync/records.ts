@@ -32,31 +32,42 @@ export function parseSnapshot(value: unknown): SyncSnapshot | undefined {
   return snapshot as SyncSnapshot;
 }
 
-async function upsertRecords(accountId: string, table: "pets" | "measurements", records: Array<Pet | Measurement>): Promise<void> {
-  const database = await ensureRemoteSchema();
-  for (const record of records) {
-    await database.execute({
-      sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, ?, ?, NULL) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at, deleted_at = NULL WHERE ${table}.account_id = excluded.account_id AND ${table}.updated_at < excluded.updated_at AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.updated_at)`,
-      args: [record.id, accountId, JSON.stringify(record), record.updatedAt],
-    });
-  }
-}
-
-async function applyTombstones(accountId: string, tombstones: Tombstone[]): Promise<void> {
-  const database = await ensureRemoteSchema();
-  for (const tombstone of tombstones) {
-    const table = tombstone.entityType === "pet" ? "pets" : "measurements";
-    await database.execute({
-      sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET deleted_at = excluded.deleted_at WHERE ${table}.account_id = excluded.account_id AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.deleted_at)`,
-      args: [tombstone.entityId, accountId, tombstone.deletedAt, tombstone.deletedAt],
-    });
-  }
-}
-
 export async function mergeSnapshot(accountId: string, snapshot: SyncSnapshot): Promise<SyncSnapshot> {
-  await upsertRecords(accountId, "pets", snapshot.pets);
-  await upsertRecords(accountId, "measurements", snapshot.measurements);
-  await applyTombstones(accountId, snapshot.tombstones);
+  const database = await ensureRemoteSchema();
+  const records = [
+    ...snapshot.pets.map((record) => ({ table: "pets" as const, record })),
+    ...snapshot.measurements.map((record) => ({
+      table: "measurements" as const,
+      record,
+    })),
+  ];
+  await database.batch(
+    [
+      ...records.map(({ table, record }) => ({
+        sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, ?, ?, NULL) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at, deleted_at = NULL WHERE ${table}.account_id = excluded.account_id AND ${table}.updated_at < excluded.updated_at AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.updated_at)`,
+        args: [
+          record.id,
+          accountId,
+          JSON.stringify(record),
+          record.updatedAt,
+        ],
+      })),
+      ...snapshot.tombstones.map((tombstone) => {
+        const table =
+          tombstone.entityType === "pet" ? "pets" : "measurements";
+        return {
+          sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET deleted_at = excluded.deleted_at WHERE ${table}.account_id = excluded.account_id AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.deleted_at)`,
+          args: [
+            tombstone.entityId,
+            accountId,
+            tombstone.deletedAt,
+            tombstone.deletedAt,
+          ],
+        };
+      }),
+    ],
+    "write",
+  );
   return getSnapshot(accountId);
 }
 
