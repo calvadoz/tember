@@ -7,7 +7,6 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent,
-  type PointerEvent,
   type ReactNode,
 } from "react";
 import { useLiveQuery } from "dexie-react-hooks";

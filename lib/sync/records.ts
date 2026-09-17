@@ -130,7 +130,7 @@ export async function getSnapshot(accountId: string): Promise<SyncSnapshot> {
     database.execute({ sql: "SELECT payload, deleted_at FROM measurements WHERE account_id = ?", args: [accountId] }),
     database.execute({ sql: "SELECT payload, deleted_at FROM vaccinations WHERE account_id = ?", args: [accountId] }),
   ]);
-  const toSnapshot = <T extends Pet | Measurement>(rows: typeof pets.rows) => rows.flatMap((row) => {
+  const toSnapshot = <T extends Pet | Measurement | Vaccination>(rows: typeof pets.rows) => rows.flatMap((row) => {
     if (row.deleted_at || typeof row.payload !== "string") return [];
     try { return [JSON.parse(row.payload) as T]; } catch { return []; }
   });
