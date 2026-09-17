@@ -16,6 +16,10 @@
 - Added shared-household sync with a server-only Turso connection, a first-device shared username-and-password setup, durable sessions, and local IndexedDB cache synchronization using stable IDs and deletion tombstones.
 - Made an open signed-in device refresh shared records every 30 seconds and whenever Tember returns to the foreground. Saving a local change still synchronizes immediately.
 - Made first-account setup responsive by completing it before the background upload, and batched initial and subsequent record writes into one Turso transaction instead of one remote request per record.
+- Migrated the prepared Debbie, Jake, and Mochi portraits into the existing shared household records as synced data URLs, then removed automatic sample data from new local databases. New devices now start empty until the shared account is signed in.
+- Corrected first-session record loading by re-running the Pets database queries once local storage is ready, so synced pets appear without navigating away and back.
+- Made the shared-account screen explicitly offer both sign-in and account creation. Account existence now chooses the initial option only, rather than restricting the screen.
+- Added a centred, reduced-motion-aware loading screen while a signed-in device completes its initial household sync. If sync cannot be reached, the device continues with its existing local cache.
 
 ## 2026-06-22
 

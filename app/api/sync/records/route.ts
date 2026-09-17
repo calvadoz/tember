@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getSessionAccount } from "@/lib/sync/auth";
-import { getSnapshot, mergeSnapshot, parseSnapshot } from "@/lib/sync/records";
+import {
+  mergeSnapshot,
+  migrateLegacyPortraits,
+  parseSnapshot,
+} from "@/lib/sync/records";
 import { isSyncConfigured } from "@/lib/sync/turso";
 
 export const runtime = "nodejs";
@@ -11,10 +15,12 @@ async function accountOrUnauthorized() {
   return getSessionAccount();
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const account = await accountOrUnauthorized();
   if (!account) return NextResponse.json({ error: "Sign in to sync." }, { status: 401 });
-  return NextResponse.json(await getSnapshot(account.id));
+  return NextResponse.json(
+    await migrateLegacyPortraits(account.id, new URL(request.url).origin),
+  );
 }
 
 export async function POST(request: Request) {
@@ -22,5 +28,8 @@ export async function POST(request: Request) {
   if (!account) return NextResponse.json({ error: "Sign in to sync." }, { status: 401 });
   const snapshot = parseSnapshot(await request.json().catch(() => undefined));
   if (!snapshot) return NextResponse.json({ error: "Invalid sync data." }, { status: 400 });
-  return NextResponse.json(await mergeSnapshot(account.id, snapshot));
+  await mergeSnapshot(account.id, snapshot);
+  return NextResponse.json(
+    await migrateLegacyPortraits(account.id, new URL(request.url).origin),
+  );
 }

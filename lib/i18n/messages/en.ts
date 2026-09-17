@@ -51,6 +51,15 @@ export const en: Messages = {
     setupBody:
       "Use one account name and password on both devices. Your existing records will sync after you continue.",
     signInHeading: "Sign in to your shared account",
+    signInBody:
+      "Use the account name and password your household already shares. Your records will load after you continue.",
+    accountAction: "Choose an account action",
+    signInMode: "Sign in",
+    createAccountMode: "Create account",
+    loadingLabel: "Syncing shared data",
+    loadingHeading: "Syncing your pet records",
+    loadingBody:
+      "Loading the latest shared records. This usually takes only a moment.",
     username: "Account name",
     password: "Password",
     passwordHelp: "Use at least 12 characters.",
@@ -80,7 +89,7 @@ export const en: Messages = {
     replacePhoto: "Replace photo",
     removePhoto: "Remove photo",
     photoPreview: "Pet portrait preview",
-    photoHelp: "JPG, PNG, WebP, GIF, or AVIF up to 4 MB. Saved only on this device.",
+    photoHelp: "JPG, PNG, WebP, GIF, or AVIF up to 4 MB. Included in your shared household sync.",
     photoError: "Choose an image up to 4 MB.",
     sex: "Sex",
     birthDate: "Birth date",

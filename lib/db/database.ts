@@ -6,7 +6,6 @@ import type {
   Pet,
   PetDraft,
 } from "@/lib/domain";
-import { defaultMeasurements, defaultPets } from "@/lib/db/default-data";
 import type { SyncSnapshot, Tombstone } from "@/lib/sync/types";
 import {
   measurementDraftSchema,
@@ -42,56 +41,8 @@ class TemberDatabase extends Dexie {
 export const db = new TemberDatabase();
 export { TemberDatabase };
 
-const legacyDefaultDataStateKey = "default-data-v1";
-const defaultDataStateKey = "default-data-v2";
-const legacyDefaultPetIds = defaultPets.slice(0, 2).map((pet) => pet.id);
-
-export async function ensureDefaultData(): Promise<void> {
-  await db.transaction(
-    "rw",
-    db.pets,
-    db.measurements,
-    db.appState,
-    async () => {
-      if (await db.appState.get(defaultDataStateKey)) return;
-
-      const legacySeedApplied = await db.appState.get(
-        legacyDefaultDataStateKey,
-      );
-      const existingLegacyPets = await db.pets.bulkGet(legacyDefaultPetIds);
-      const canUpgradeLegacySeed =
-        Boolean(legacySeedApplied) && existingLegacyPets.every(Boolean);
-
-      if (!legacySeedApplied || canUpgradeLegacySeed) {
-        const existingPetIds = new Set(
-          (await db.pets.bulkGet(defaultPets.map((pet) => pet.id)))
-            .filter((pet): pet is Pet => Boolean(pet))
-            .map((pet) => pet.id),
-        );
-        const existingMeasurementIds = new Set(
-          (await db.measurements.bulkGet(defaultMeasurements.map((measurement) => measurement.id)))
-            .filter((measurement): measurement is Measurement =>
-              Boolean(measurement),
-            )
-            .map((measurement) => measurement.id),
-        );
-        await db.pets.bulkAdd(
-          defaultPets.filter((pet) => !existingPetIds.has(pet.id)),
-        );
-        await db.measurements.bulkAdd(
-          defaultMeasurements.filter(
-            (measurement) => !existingMeasurementIds.has(measurement.id),
-          ),
-        );
-      }
-
-      await db.appState.put({
-        key: legacyDefaultDataStateKey,
-        value: "complete",
-      });
-      await db.appState.put({ key: defaultDataStateKey, value: "complete" });
-    },
-  );
+export async function ensureLocalDatabase(): Promise<void> {
+  await db.open();
 }
 
 function nowIso(): string {

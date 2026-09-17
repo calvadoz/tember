@@ -8,11 +8,11 @@ vi.mock("dexie-react-hooks", () => ({
 
 vi.mock("@/lib/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/db")>()),
-  ensureDefaultData: vi.fn().mockResolvedValue(undefined),
+  ensureLocalDatabase: vi.fn().mockResolvedValue(undefined),
 }));
 
 import Home from "@/app/page";
-import { ensureDefaultData } from "@/lib/db";
+import { ensureLocalDatabase } from "@/lib/db";
 import { getMessages } from "@/lib/i18n/messages";
 
 const messages = getMessages();
@@ -34,7 +34,7 @@ describe("Home", () => {
 
   it("shows a loader instead of the empty state while local data initializes", async () => {
     let finishInitialization: (() => void) | undefined;
-    vi.mocked(ensureDefaultData).mockReturnValueOnce(
+    vi.mocked(ensureLocalDatabase).mockReturnValueOnce(
       new Promise<void>((resolve) => {
         finishInitialization = resolve;
       }),

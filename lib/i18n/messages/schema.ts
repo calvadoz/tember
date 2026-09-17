@@ -32,6 +32,13 @@ export type Messages = {
     setupHeading: string;
     setupBody: string;
     signInHeading: string;
+    signInBody: string;
+    accountAction: string;
+    signInMode: string;
+    createAccountMode: string;
+    loadingLabel: string;
+    loadingHeading: string;
+    loadingBody: string;
     username: string;
     password: string;
     passwordHelp: string;

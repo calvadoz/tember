@@ -15,7 +15,7 @@
 - Provide a responsive pet dashboard, pet journals, a weight chart, and an accessible measurement history table.
 - Provide versioned JSON backup and atomic replacement import, plus measurement CSV export.
 - Let the user delete all local Tember data after an explicit confirmation.
-- Seed Debbie and Jake once in a new empty database, with their supplied measurement histories and derived age estimates.
+- Add initial Debbie and Jake records during the local-first prototype, before shared sync is introduced.
 - Test that a measurement works with only a calendar date and weight.
 - Pet photos are deferred until durable local image storage is designed and approved.
 
@@ -24,9 +24,9 @@
 - Reframed the product and interface around private pet growth records, without changing the local-first measurement, calculation, import, export, or deletion behavior.
 - Made the existing optional length, width, and height fields generic in the interface while retaining their storage format for backup compatibility.
 - Expanded the pet-type selector to include common companion animals while preserving all existing tortoise types.
-- Replaced the initial seed with the supplied Debbie, Jake, and Mochi backup. New local databases receive it once, and existing Debbie/Jake seed databases receive a one-time additive update without overwriting local records.
+- Migrated the supplied Debbie, Jake, and Mochi records into the shared household account, then removed automatic sample records from new local databases.
 - Reworked the weight chart for dense histories with range controls, sparse markers, touch and keyboard selection, and a clear selected-record readout.
-- Added optional local pet portraits, including a replaceable default illustration. Portraits travel in JSON backups and remain on the current device unless exported.
+- Added optional pet portraits, including a replaceable default illustration. Portraits travel in JSON backups and shared household sync.
 
 ## Iteration 4, Shared household sync: complete
 

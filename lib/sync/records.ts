@@ -4,6 +4,12 @@ import type { Measurement, Pet } from "@/lib/domain";
 import type { SyncSnapshot, Tombstone } from "@/lib/sync/types";
 import { ensureRemoteSchema } from "@/lib/sync/turso";
 
+const legacyPortraitSources: Record<string, string> = {
+  "00000000-0000-4000-8000-000000000001": "/images/pets/debbie.png",
+  "00000000-0000-4000-8000-000000000002": "/images/pets/jake.png",
+  "59915277-c742-430c-aa98-09fe1b737b2b": "/images/pets/mochi.png",
+};
+
 function isIso(value: unknown): value is string {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
@@ -66,6 +72,49 @@ export async function mergeSnapshot(accountId: string, snapshot: SyncSnapshot): 
         };
       }),
     ],
+    "write",
+  );
+  return getSnapshot(accountId);
+}
+
+export async function migrateLegacyPortraits(
+  accountId: string,
+  assetOrigin: string,
+): Promise<SyncSnapshot> {
+  const snapshot = await getSnapshot(accountId);
+  const missingPortraits = snapshot.pets.filter(
+    (pet) => !pet.photoDataUrl && legacyPortraitSources[pet.id],
+  );
+  if (!missingPortraits.length) return snapshot;
+
+  const migratedAt = new Date().toISOString();
+  const portraitPets = await Promise.all(
+    missingPortraits.map(async (pet) => {
+      const response = await fetch(
+        new URL(legacyPortraitSources[pet.id], assetOrigin),
+      );
+      if (!response.ok) return undefined;
+      const contentType = response.headers.get("content-type") ?? "image/png";
+      const bytes = Buffer.from(await response.arrayBuffer()).toString("base64");
+      return {
+        ...pet,
+        photoDataUrl: `data:${contentType};base64,${bytes}`,
+        updatedAt: migratedAt,
+      };
+    }),
+  );
+  const completePets: Pet[] = [];
+  for (const pet of portraitPets) {
+    if (pet) completePets.push(pet);
+  }
+  if (!completePets.length) return snapshot;
+
+  const database = await ensureRemoteSchema();
+  await database.batch(
+    completePets.map((pet) => ({
+      sql: "INSERT INTO pets (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, ?, ?, NULL) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at, deleted_at = NULL WHERE pets.account_id = excluded.account_id AND pets.updated_at < excluded.updated_at AND (pets.deleted_at IS NULL OR pets.deleted_at < excluded.updated_at)",
+      args: [pet.id, accountId, JSON.stringify(pet), pet.updatedAt],
+    })),
     "write",
   );
   return getSnapshot(accountId);

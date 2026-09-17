@@ -36,7 +36,7 @@ import {
   db,
   deleteMeasurement,
   deletePet,
-  ensureDefaultData,
+  ensureLocalDatabase,
   updateMeasurement,
   updatePet,
 } from "@/lib/db";
@@ -129,19 +129,11 @@ function Field({
 const inputClass =
   "min-h-11 min-w-0 max-w-full w-full rounded-md border bg-white px-3 py-2 text-base font-normal text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15";
 
-const seededPetPortraits: Record<string, string> = {
-  "00000000-0000-4000-8000-000000000001": "/images/pets/debbie.png",
-  "00000000-0000-4000-8000-000000000002": "/images/pets/jake.png",
-  "59915277-c742-430c-aa98-09fe1b737b2b": "/images/pets/mochi.png",
-};
-
 function PetPortrait({
   photoDataUrl,
-  petId,
   size = "regular",
 }: {
   photoDataUrl?: string;
-  petId?: string;
   size?: "small" | "regular" | "large";
 }) {
   const sizeClass = {
@@ -150,8 +142,7 @@ function PetPortrait({
     large: "size-24",
   }[size];
 
-  const source =
-    photoDataUrl ?? seededPetPortraits[petId ?? ""] ?? "/images/pet-portrait-placeholder.png";
+  const source = photoDataUrl ?? "/images/pet-portrait-placeholder.png";
 
   return (
     <div
@@ -303,7 +294,7 @@ function PetForm({ pet, onClose }: { pet?: Pet; onClose: () => void }) {
         </Field>
         <section className="rounded-lg border bg-gradient-to-br from-emerald-50 via-card to-amber-50/70 p-4">
           <div className="flex items-center gap-4">
-            <PetPortrait photoDataUrl={photoDataUrl} petId={pet?.id} size="regular" />
+            <PetPortrait photoDataUrl={photoDataUrl} size="regular" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-primary">
                 {messages.pet.photo}
@@ -1126,7 +1117,7 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
         </Button>
         <header className="tember-hero flex flex-col justify-between gap-5 rounded-2xl p-5 sm:flex-row sm:items-start sm:p-7">
           <div className="flex items-center gap-4">
-            <PetPortrait photoDataUrl={pet.photoDataUrl} petId={pet.id} size="regular" />
+            <PetPortrait photoDataUrl={pet.photoDataUrl} size="regular" />
             <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
               {messages.species[pet.species]}
@@ -1472,8 +1463,11 @@ function PetList({
 }) {
   const pets = useLiveQuery(() =>
     db.pets.orderBy("updatedAt").reverse().toArray(),
+    [storageReady],
   );
-  const measurements = useLiveQuery(() => db.measurements.toArray());
+  const measurements = useLiveQuery(() => db.measurements.toArray(), [
+    storageReady,
+  ]);
   const [editing, setEditing] = useState(false);
   const loading =
     !storageReady || pets === undefined || measurements === undefined;
@@ -1523,7 +1517,7 @@ function PetList({
                   key={pet.id}
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <PetPortrait photoDataUrl={pet.photoDataUrl} petId={pet.id} />
+                    <PetPortrait photoDataUrl={pet.photoDataUrl} />
                     <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {messages.species[pet.species]}
                     </span>
@@ -1744,8 +1738,12 @@ function SyncAccountScreen({
   bootstrapNeeded: boolean;
   onComplete: () => void;
 }) {
+  const [mode, setMode] = useState<"create" | "signIn">(
+    bootstrapNeeded ? "create" : "signIn",
+  );
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const creatingAccount = mode === "create";
 
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-5 py-10">
@@ -1759,7 +1757,7 @@ function SyncAccountScreen({
           try {
             const username = String(data.get("username") ?? "");
             const password = String(data.get("password") ?? "");
-            if (bootstrapNeeded) await createSharedAccount(username, password);
+            if (creatingAccount) await createSharedAccount(username, password);
             else await signInToSync(username, password);
             onComplete();
           } catch (cause) {
@@ -1776,13 +1774,43 @@ function SyncAccountScreen({
           {messages.sync.setupEyebrow}
         </p>
         <h1 className="mt-2 font-display text-3xl font-bold text-primary">
-          {bootstrapNeeded
+          {creatingAccount
             ? messages.sync.setupHeading
             : messages.sync.signInHeading}
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {messages.sync.setupBody}
+          {creatingAccount ? messages.sync.setupBody : messages.sync.signInBody}
         </p>
+        <div
+          aria-label={messages.sync.accountAction}
+          className="mt-6 grid grid-cols-2 gap-2 rounded-md bg-muted p-1"
+          role="group"
+        >
+          <Button
+            aria-pressed={mode === "signIn"}
+            className="w-full"
+            onClick={() => {
+              setError(undefined);
+              setMode("signIn");
+            }}
+            type="button"
+            variant={mode === "signIn" ? "default" : "ghost"}
+          >
+            {messages.sync.signInMode}
+          </Button>
+          <Button
+            aria-pressed={mode === "create"}
+            className="w-full"
+            onClick={() => {
+              setError(undefined);
+              setMode("create");
+            }}
+            type="button"
+            variant={mode === "create" ? "default" : "ghost"}
+          >
+            {messages.sync.createAccountMode}
+          </Button>
+        </div>
         <div className="mt-7 grid gap-5">
           <Field label={messages.sync.username}>
             <input
@@ -1794,7 +1822,7 @@ function SyncAccountScreen({
           </Field>
           <Field label={messages.sync.password} hint={messages.sync.passwordHelp}>
             <input
-              autoComplete={bootstrapNeeded ? "new-password" : "current-password"}
+              autoComplete={creatingAccount ? "new-password" : "current-password"}
               className={inputClass}
               minLength={12}
               name="password"
@@ -1809,11 +1837,35 @@ function SyncAccountScreen({
           </p>
         ) : null}
         <Button className="mt-7 w-full" disabled={saving} type="submit">
-          {bootstrapNeeded
+          {creatingAccount
             ? messages.sync.createAccount
             : messages.sync.signIn}
         </Button>
       </form>
+    </main>
+  );
+}
+
+function SyncLoadingScreen() {
+  return (
+    <main className="grid min-h-dvh place-items-center bg-background px-5 py-10">
+      <section
+        aria-label={messages.sync.loadingLabel}
+        aria-live="polite"
+        className="grid w-full max-w-md justify-items-center rounded-2xl border bg-card p-8 text-center shadow-ambient sm:p-10"
+        role="status"
+      >
+        <ShellMark className="size-14 animate-pulse text-primary motion-reduce:animate-none" />
+        <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+          {messages.sync.setupEyebrow}
+        </p>
+        <h1 className="mt-2 font-display text-3xl font-bold text-primary">
+          {messages.sync.loadingHeading}
+        </h1>
+        <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
+          {messages.sync.loadingBody}
+        </p>
+      </section>
     </main>
   );
 }
@@ -1823,9 +1875,10 @@ export function TemberApp() {
   const [petId, setPetId] = useState<string>();
   const [storageReady, setStorageReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>();
+  const [initialSyncComplete, setInitialSyncComplete] = useState(false);
   useEffect(() => {
     let active = true;
-    void ensureDefaultData()
+    void ensureLocalDatabase()
       .catch(() => undefined)
       .then(() => {
         if (active) setStorageReady(true);
@@ -1855,31 +1908,44 @@ export function TemberApp() {
     };
   }, [storageReady]);
   useEffect(() => {
-    if (!storageReady || !syncStatus?.authenticated) return;
+    if (!storageReady || !syncStatus?.authenticated) {
+      setInitialSyncComplete(false);
+      return;
+    }
     let syncing = false;
-    const sync = () => {
+    let active = true;
+    const sync = async () => {
       if (syncing) return;
       syncing = true;
-      void syncNow().finally(() => {
+      try {
+        await syncNow();
+      } finally {
         syncing = false;
-      });
+      }
     };
-    const pullLatest = () => {
+    const pullLatest = async () => {
       if (syncing || document.visibilityState !== "visible") return;
       syncing = true;
-      void pullLatestSync().finally(() => {
+      try {
+        await pullLatestSync();
+      } finally {
         syncing = false;
-      });
+      }
     };
-    sync();
-    window.addEventListener("tember-local-change", sync);
-    window.addEventListener("online", sync);
-    document.addEventListener("visibilitychange", pullLatest);
-    const refreshInterval = window.setInterval(pullLatest, 30_000);
+    const requestSync = () => void sync().catch(() => undefined);
+    const requestPullLatest = () => void pullLatest().catch(() => undefined);
+    void sync().catch(() => undefined).finally(() => {
+      if (active) setInitialSyncComplete(true);
+    });
+    window.addEventListener("tember-local-change", requestSync);
+    window.addEventListener("online", requestSync);
+    document.addEventListener("visibilitychange", requestPullLatest);
+    const refreshInterval = window.setInterval(requestPullLatest, 30_000);
     return () => {
-      window.removeEventListener("tember-local-change", sync);
-      window.removeEventListener("online", sync);
-      document.removeEventListener("visibilitychange", pullLatest);
+      active = false;
+      window.removeEventListener("tember-local-change", requestSync);
+      window.removeEventListener("online", requestSync);
+      document.removeEventListener("visibilitychange", requestPullLatest);
       window.clearInterval(refreshInterval);
     };
   }, [storageReady, syncStatus?.authenticated]);
@@ -1896,6 +1962,9 @@ export function TemberApp() {
         }
       />
     );
+  }
+  if (storageReady && syncStatus?.authenticated && !initialSyncComplete) {
+    return <SyncLoadingScreen />;
   }
   return (
     <div className="min-h-dvh min-w-0 max-w-full overflow-x-clip lg:flex">
