@@ -20,6 +20,9 @@
 - Corrected first-session record loading by re-running the Pets database queries once local storage is ready, so synced pets appear without navigating away and back.
 - Made the shared-account screen explicitly offer both sign-in and account creation. Account existence now chooses the initial option only, rather than restricting the screen.
 - Added a centred, reduced-motion-aware loading screen while a signed-in device completes its initial household sync. If sync cannot be reached, the device continues with its existing local cache.
+- Replaced the full upload-and-download cycle on authenticated page refreshes with a background pull. A full merge still runs immediately after a user signs in or creates the shared account.
+- Prevented the Pets dashboard from flashing while Tember checks whether this browser is signed in.
+- Refined the account screen language around a professional Tember account, while keeping the cross-device sync explanation in supporting copy.
 
 ## 2026-06-22
 

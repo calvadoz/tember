@@ -39,6 +39,9 @@ export type Messages = {
     loadingLabel: string;
     loadingHeading: string;
     loadingBody: string;
+    checkingLabel: string;
+    checkingHeading: string;
+    checkingBody: string;
     username: string;
     password: string;
     passwordHelp: string;

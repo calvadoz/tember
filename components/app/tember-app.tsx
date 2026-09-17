@@ -1846,11 +1846,11 @@ function SyncAccountScreen({
   );
 }
 
-function SyncLoadingScreen() {
+function SyncLoadingScreen({ checking = false }: { checking?: boolean }) {
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-5 py-10">
       <section
-        aria-label={messages.sync.loadingLabel}
+        aria-label={checking ? messages.sync.checkingLabel : messages.sync.loadingLabel}
         aria-live="polite"
         className="grid w-full max-w-md justify-items-center rounded-2xl border bg-card p-8 text-center shadow-ambient sm:p-10"
         role="status"
@@ -1860,10 +1860,10 @@ function SyncLoadingScreen() {
           {messages.sync.setupEyebrow}
         </p>
         <h1 className="mt-2 font-display text-3xl font-bold text-primary">
-          {messages.sync.loadingHeading}
+          {checking ? messages.sync.checkingHeading : messages.sync.loadingHeading}
         </h1>
         <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
-          {messages.sync.loadingBody}
+          {checking ? messages.sync.checkingBody : messages.sync.loadingBody}
         </p>
       </section>
     </main>
@@ -1876,6 +1876,8 @@ export function TemberApp() {
   const [storageReady, setStorageReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>();
   const [initialSyncComplete, setInitialSyncComplete] = useState(false);
+  const [hasCachedRecords, setHasCachedRecords] = useState<boolean>();
+  const initialMergeRequested = useRef(false);
   useEffect(() => {
     let active = true;
     void ensureLocalDatabase()
@@ -1908,7 +1910,22 @@ export function TemberApp() {
     };
   }, [storageReady]);
   useEffect(() => {
+    if (!storageReady) return;
+    let active = true;
+    void Promise.all([db.pets.count(), db.measurements.count()])
+      .then(([petCount, measurementCount]) => {
+        if (active) setHasCachedRecords(petCount + measurementCount > 0);
+      })
+      .catch(() => {
+        if (active) setHasCachedRecords(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [storageReady]);
+  useEffect(() => {
     if (!storageReady || !syncStatus?.authenticated) {
+      initialMergeRequested.current = false;
       setInitialSyncComplete(false);
       return;
     }
@@ -1934,7 +1951,9 @@ export function TemberApp() {
     };
     const requestSync = () => void sync().catch(() => undefined);
     const requestPullLatest = () => void pullLatest().catch(() => undefined);
-    void sync().catch(() => undefined).finally(() => {
+    const initialSync = initialMergeRequested.current ? sync : pullLatest;
+    initialMergeRequested.current = false;
+    void initialSync().catch(() => undefined).finally(() => {
       if (active) setInitialSyncComplete(true);
     });
     window.addEventListener("tember-local-change", requestSync);
@@ -1953,17 +1972,27 @@ export function TemberApp() {
     return (
       <SyncAccountScreen
         bootstrapNeeded={syncStatus.bootstrapNeeded}
-        onComplete={() =>
+        onComplete={() => {
+          initialMergeRequested.current = true;
+          setInitialSyncComplete(false);
           setSyncStatus((status) =>
             status
               ? { ...status, authenticated: true, bootstrapNeeded: false }
               : status,
-          )
-        }
+          );
+        }}
       />
     );
   }
-  if (storageReady && syncStatus?.authenticated && !initialSyncComplete) {
+  if (storageReady && syncStatus === undefined) {
+    return <SyncLoadingScreen checking />;
+  }
+  if (
+    storageReady &&
+    syncStatus?.authenticated &&
+    hasCachedRecords === false &&
+    !initialSyncComplete
+  ) {
     return <SyncLoadingScreen />;
   }
   return (
