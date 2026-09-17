@@ -6,10 +6,13 @@ import {
   formatCalendarYear,
   formatChartDate,
   formatDateTime,
+  formatDisplayWeight,
   formatLength,
   formatMeasurementListDate,
   formatNumber,
+  formatPetAge,
   formatWeight,
+  formatWeightChange,
 } from "@/lib/i18n/format";
 
 describe("localized formatting", () => {
@@ -46,5 +49,16 @@ describe("localized formatting", () => {
     expect(formatNumber(1234.5)).toMatch(/1.+234/);
     expect(formatWeight(1500, "kg")).toContain("1.5");
     expect(formatLength(125, "cm")).toContain("12.5");
+  });
+
+  it("adapts displayed weights and weight changes without changing stored grams", () => {
+    expect(formatDisplayWeight(750)).toContain("750");
+    expect(formatDisplayWeight(2_250)).toContain("2.25");
+    expect(formatWeightChange(-1_250)).toContain("−1.25");
+  });
+
+  it("formats natural pet ages", () => {
+    expect(formatPetAge(0.6, { approximate: true })).toBe("~7 months");
+    expect(formatPetAge(2.25)).toBe("2 years 3 months");
   });
 });

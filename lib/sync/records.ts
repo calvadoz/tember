@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Measurement, Pet } from "@/lib/domain";
+import type { Measurement, Pet, Vaccination } from "@/lib/domain";
 import type { SyncSnapshot, Tombstone } from "@/lib/sync/types";
 import { ensureRemoteSchema } from "@/lib/sync/turso";
 
@@ -19,7 +19,7 @@ function isValidTombstone(value: unknown): value is Tombstone {
   const item = value as Record<string, unknown>;
   return (
     typeof item.entityId === "string" &&
-    (item.entityType === "pet" || item.entityType === "measurement") &&
+    (item.entityType === "pet" || item.entityType === "measurement" || item.entityType === "vaccination") &&
     isIso(item.deletedAt)
   );
 }
@@ -33,8 +33,8 @@ function isRecordWithDates(value: unknown): value is Pet | Measurement {
 export function parseSnapshot(value: unknown): SyncSnapshot | undefined {
   if (!value || typeof value !== "object") return undefined;
   const snapshot = value as Partial<SyncSnapshot>;
-  if (!Array.isArray(snapshot.pets) || !Array.isArray(snapshot.measurements) || !Array.isArray(snapshot.tombstones)) return undefined;
-  if (!snapshot.pets.every(isRecordWithDates) || !snapshot.measurements.every(isRecordWithDates) || !snapshot.tombstones.every(isValidTombstone)) return undefined;
+  if (!Array.isArray(snapshot.pets) || !Array.isArray(snapshot.measurements) || !Array.isArray(snapshot.vaccinations) || !Array.isArray(snapshot.tombstones)) return undefined;
+  if (!snapshot.pets.every(isRecordWithDates) || !snapshot.measurements.every(isRecordWithDates) || !snapshot.vaccinations.every(isRecordWithDates) || !snapshot.tombstones.every(isValidTombstone)) return undefined;
   return snapshot as SyncSnapshot;
 }
 
@@ -44,6 +44,10 @@ export async function mergeSnapshot(accountId: string, snapshot: SyncSnapshot): 
     ...snapshot.pets.map((record) => ({ table: "pets" as const, record })),
     ...snapshot.measurements.map((record) => ({
       table: "measurements" as const,
+      record,
+    })),
+    ...snapshot.vaccinations.map((record) => ({
+      table: "vaccinations" as const,
       record,
     })),
   ];
@@ -59,8 +63,7 @@ export async function mergeSnapshot(accountId: string, snapshot: SyncSnapshot): 
         ],
       })),
       ...snapshot.tombstones.map((tombstone) => {
-        const table =
-          tombstone.entityType === "pet" ? "pets" : "measurements";
+        const table = tombstone.entityType === "pet" ? "pets" : tombstone.entityType === "measurement" ? "measurements" : "vaccinations";
         return {
           sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET deleted_at = excluded.deleted_at WHERE ${table}.account_id = excluded.account_id AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.deleted_at)`,
           args: [
@@ -122,9 +125,10 @@ export async function migrateLegacyPortraits(
 
 export async function getSnapshot(accountId: string): Promise<SyncSnapshot> {
   const database = await ensureRemoteSchema();
-  const [pets, measurements] = await Promise.all([
+  const [pets, measurements, vaccinations] = await Promise.all([
     database.execute({ sql: "SELECT payload, deleted_at FROM pets WHERE account_id = ?", args: [accountId] }),
     database.execute({ sql: "SELECT payload, deleted_at FROM measurements WHERE account_id = ?", args: [accountId] }),
+    database.execute({ sql: "SELECT payload, deleted_at FROM vaccinations WHERE account_id = ?", args: [accountId] }),
   ]);
   const toSnapshot = <T extends Pet | Measurement>(rows: typeof pets.rows) => rows.flatMap((row) => {
     if (row.deleted_at || typeof row.payload !== "string") return [];
@@ -136,6 +140,7 @@ export async function getSnapshot(accountId: string): Promise<SyncSnapshot> {
   return {
     pets: toSnapshot<Pet>(pets.rows),
     measurements: toSnapshot<Measurement>(measurements.rows),
-    tombstones: [...toTombstones(pets.rows, "pet"), ...toTombstones(measurements.rows, "measurement")],
+    vaccinations: toSnapshot<Vaccination>(vaccinations.rows),
+    tombstones: [...toTombstones(pets.rows, "pet"), ...toTombstones(measurements.rows, "measurement"), ...toTombstones(vaccinations.rows, "vaccination")],
   };
 }

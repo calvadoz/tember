@@ -116,6 +116,32 @@ export function formatWeight(
   }).format(value);
 }
 
+/** Shows small weights in grams and larger weights in kilograms without changing storage. */
+export function formatDisplayWeight(
+  weightGram: number,
+  { locale = defaultLocale }: FormatOptions = {},
+): string {
+  return formatWeight(weightGram, weightGram >= 1_000 ? "kg" : "g", {
+    locale,
+  });
+}
+
+export function formatWeightChange(
+  changeGram: number,
+  { locale = defaultLocale }: FormatOptions = {},
+): string {
+  const absolute = Math.abs(changeGram);
+  const value = absolute >= 1_000 ? absolute / 1_000 : absolute;
+  const unit = absolute >= 1_000 ? "kilogram" : "gram";
+  const formatted = new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit,
+    unitDisplay: "short",
+    maximumFractionDigits: unit === "kilogram" ? 2 : 0,
+  }).format(value);
+  return `${changeGram > 0 ? "+" : changeGram < 0 ? "−" : ""}${formatted}`;
+}
+
 export function formatLength(
   lengthMm: number,
   unit: "mm" | "cm",
@@ -142,4 +168,35 @@ export function formatAgeYears(
     unitDisplay: "long",
     maximumFractionDigits: 1,
   }).format(years);
+}
+
+export function formatPetAge(
+  years: number,
+  { locale = defaultLocale, approximate = false }: FormatOptions & { approximate?: boolean } = {},
+): string {
+  const months = Math.max(0, Math.round(years * 12));
+  const wholeYears = Math.floor(months / 12);
+  const remainingMonths = months % 12;
+  const parts: string[] = [];
+  if (wholeYears) {
+    parts.push(
+      new Intl.NumberFormat(locale, {
+        style: "unit",
+        unit: "year",
+        unitDisplay: "long",
+        maximumFractionDigits: 0,
+      }).format(wholeYears),
+    );
+  }
+  if (remainingMonths || !parts.length) {
+    parts.push(
+      new Intl.NumberFormat(locale, {
+        style: "unit",
+        unit: "month",
+        unitDisplay: "long",
+        maximumFractionDigits: 0,
+      }).format(remainingMonths),
+    );
+  }
+  return `${approximate ? "~" : ""}${parts.join(" ")}`;
 }

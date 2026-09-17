@@ -32,13 +32,16 @@ import { Button } from "@/components/ui/button";
 import {
   createMeasurement,
   createPet,
+  createVaccination,
   clearAllLocalData,
   db,
   deleteMeasurement,
   deletePet,
+  deleteVaccination,
   ensureLocalDatabase,
   updateMeasurement,
   updatePet,
+  updateVaccination,
 } from "@/lib/db";
 import {
   createSharedAccount,
@@ -56,6 +59,8 @@ import type {
   PetDraft,
   PetSex,
   PetSpecies,
+  Vaccination,
+  VaccinationDraft,
   WeightUnit,
 } from "@/lib/domain";
 import {
@@ -65,7 +70,9 @@ import {
   lengthToMm,
   mmToLength,
   petSpecies,
+  weightChangeGram,
   weightChangePercent,
+  weightChangeTone,
   weightToGram,
 } from "@/lib/domain";
 import {
@@ -76,14 +83,16 @@ import {
   replaceWithBackup,
 } from "@/lib/export";
 import {
-  formatAgeYears,
+  formatDisplayWeight,
   formatCalendarDate,
   formatCalendarYear,
   formatChartDate,
   formatLength,
   formatMeasurementListDate,
   formatNumber,
+  formatPetAge,
   formatWeight,
+  formatWeightChange,
 } from "@/lib/i18n/format";
 import { getMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -186,6 +195,45 @@ function SexIdentifier({
     >
       <span aria-hidden="true">{sex === "female" ? "♀" : "♂"}</span>
       <span className="sr-only">{messages.sex[sex]}</span>
+    </span>
+  );
+}
+
+function WeightChange({
+  previousWeightGram,
+  weightGram,
+  compact = false,
+  className,
+}: {
+  previousWeightGram?: number;
+  weightGram: number;
+  compact?: boolean;
+  className?: string;
+}) {
+  if (previousWeightGram === undefined) {
+    return (
+      <span className="text-xs font-medium text-muted-foreground">
+        {messages.measurement.noPreviousRecord}
+      </span>
+    );
+  }
+  const percent = weightChangePercent(previousWeightGram, weightGram);
+  const tone = weightChangeTone(previousWeightGram, weightGram);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-baseline gap-1 font-semibold tabular-nums",
+        compact ? "text-xs" : "text-sm",
+        tone === "positive" && "text-emerald-700",
+        tone === "decrease" && "text-amber-800",
+        tone === "neutral" && "text-muted-foreground",
+        className,
+      )}
+    >
+      <span>{formatWeightChange(weightChangeGram(previousWeightGram, weightGram))}</span>
+      <span className="font-normal text-current/80">
+        ({formatNumber(percent / 100, { maximumFractionDigits: 1, signDisplay: "always", style: "percent" })})
+      </span>
     </span>
   );
 }
@@ -668,6 +716,70 @@ function Confirm({
   );
 }
 
+function VaccinationForm({
+  petId,
+  vaccination,
+  onClose,
+}: {
+  petId: string;
+  vaccination?: Vaccination;
+  onClose: () => void;
+}) {
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const data = new FormData(event.currentTarget);
+    const draft: VaccinationDraft = {
+      petId,
+      name: String(data.get("name") ?? ""),
+      administeredAt: String(data.get("administeredAt") ?? ""),
+      notes: String(data.get("notes") ?? "").trim() || undefined,
+    };
+    try {
+      if (vaccination) await updateVaccination(vaccination.id, draft);
+      else await createVaccination(draft);
+      onClose();
+    } catch {
+      setError(messages.validation.saveFailed);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      onClose={onClose}
+      title={vaccination ? messages.vaccination.editHeading : messages.vaccination.newHeading}
+    >
+      <form className="mt-6 grid gap-5" onSubmit={submit}>
+        <Field label={messages.vaccination.name}>
+          <input className={inputClass} defaultValue={vaccination?.name} name="name" required />
+        </Field>
+        <Field label={messages.vaccination.date}>
+          <input
+            className={cn(inputClass, "date-input")}
+            defaultValue={vaccination?.administeredAt ?? today()}
+            name="administeredAt"
+            required
+            type="date"
+          />
+        </Field>
+        <Field label={messages.vaccination.notes} hint={messages.common.optional}>
+          <textarea className={cn(inputClass, "min-h-28 resize-y")} defaultValue={vaccination?.notes} name="notes" rows={4} />
+        </Field>
+        {error ? <p className="text-sm font-medium text-red-800" role="alert">{error}</p> : null}
+        <div className="flex flex-wrap justify-end gap-3 border-t pt-5">
+          <Button onClick={onClose} type="button" variant="outline">{messages.common.cancel}</Button>
+          <Button disabled={saving} type="submit">{messages.common.save}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function niceWeightTicks(values: number[], targetTickCount = 4): number[] {
   const minimum = Math.min(...values);
   const maximum = Math.max(...values);
@@ -907,7 +1019,7 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
           </span>
           <span className="min-w-0 text-muted-foreground">
             {formatCalendarDate(activePoint.measurement.measuredAt)} ·{" "}
-            {formatWeight(activePoint.measurement.weightGram, "g")}
+            {formatDisplayWeight(activePoint.measurement.weightGram)}
             {activePoint.significantDrop
               ? " (" +
                 formatNumber(activePoint.changePercent, {
@@ -993,7 +1105,7 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
             aria-valuemax={points.length}
             aria-valuemin={1}
             aria-valuenow={activeIndex + 1}
-            aria-valuetext={formatCalendarDate(activePoint.measurement.measuredAt) + ", " + formatWeight(activePoint.measurement.weightGram, "g")}
+            aria-valuetext={formatCalendarDate(activePoint.measurement.measuredAt) + ", " + formatDisplayWeight(activePoint.measurement.weightGram)}
             className="cursor-crosshair fill-transparent outline-none focus:stroke-primary/35"
             height={plotHeight}
             onKeyDown={handleChartKeyDown}
@@ -1019,7 +1131,7 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
               {formatCalendarDate(activePoint.measurement.measuredAt)}
             </text>
             <text fill="hsl(var(--primary-foreground))" fontSize="13" fontWeight="700" x="12" y="38">
-              {formatWeight(activePoint.measurement.weightGram, "g")}
+              {formatDisplayWeight(activePoint.measurement.weightGram)}
             </text>
             {activePoint.significantDrop ? (
               <text fill="#fecaca" fontSize="11" fontWeight="600" x="12" y="54">
@@ -1063,6 +1175,11 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
       () => db.measurements.where("petId").equals(petId).sortBy("measuredAt"),
       [petId],
     ) ?? [];
+  const vaccinations =
+    useLiveQuery(
+      () => db.vaccinations.where("petId").equals(petId).sortBy("administeredAt"),
+      [petId],
+    ) ?? [];
   const [petEditor, setPetEditor] = useState(false);
   const [measurementEditor, setMeasurementEditor] = useState<
     Measurement | "new" | null
@@ -1071,6 +1188,8 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
     null,
   );
   const [expandedMeasurementId, setExpandedMeasurementId] = useState<string>();
+  const [vaccinationEditor, setVaccinationEditor] = useState<Vaccination | "new" | null>(null);
+  const [vaccinationDeleteTarget, setVaccinationDeleteTarget] = useState<Vaccination | null>(null);
   if (!pet) return null;
   const ordered = [...measurements].reverse();
   const chronological = [...measurements].sort((a, b) =>
@@ -1078,12 +1197,13 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
   );
   const changesByMeasurementId = new Map<
     string,
-    { percent: number; significantDrop: boolean }
+    { previousWeightGram: number; percent: number; significantDrop: boolean }
   >();
   chronological.forEach((measurement, index) => {
     const previous = chronological[index - 1];
     if (!previous) return;
     changesByMeasurementId.set(measurement.id, {
+      previousWeightGram: previous.weightGram,
       percent: weightChangePercent(previous.weightGram, measurement.weightGram),
       significantDrop: isSignificantWeightDrop(
         previous.weightGram,
@@ -1152,34 +1272,46 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
           </div>
         </header>
         {latest ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <article className="rounded-2xl bg-gradient-to-br from-primary to-[#1f6b49] p-6 text-primary-foreground shadow-[0_16px_30px_rgba(21,73,46,0.18)] sm:col-span-2">
+          <div className="mt-6 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+            <article className="rounded-2xl bg-gradient-to-br from-primary to-[#1f6b49] p-6 text-primary-foreground shadow-[0_16px_30px_rgba(21,73,46,0.18)]">
               <p className="text-sm opacity-75">{messages.pet.latestWeight}</p>
               <p className="mt-2 font-display text-4xl font-bold">
-                {formatWeight(latest.weightGram, "g")}
+                {formatDisplayWeight(latest.weightGram)}
               </p>
               <p className="mt-2 text-sm opacity-75">
                 {formatCalendarDate(latest.measuredAt)}
               </p>
+              <div className="mt-3 border-t border-white/15 pt-3">
+                <p className="text-xs opacity-75">{messages.measurement.changeFromPrevious}</p>
+                <div className="mt-1">
+                  <WeightChange
+                    className="text-white [&_span:last-child]:text-white/70"
+                    previousWeightGram={changesByMeasurementId.get(latest.id)?.previousWeightGram}
+                    weightGram={latest.weightGram}
+                  />
+                </div>
+              </div>
             </article>
-            <article className="tember-stat-card rounded-2xl border bg-card/90 p-6">
-              <p className="text-sm text-muted-foreground">
+            <dl className="tember-stat-card grid grid-cols-2 divide-x rounded-2xl border bg-card/90">
+              <div className="p-5 sm:p-6">
+              <dt className="text-sm text-muted-foreground">
                 {messages.dashboard.measurementCount}
-              </p>
-              <p className="mt-2 font-display text-4xl font-bold text-primary">
+              </dt>
+              <dd className="mt-2 font-display text-3xl font-bold text-primary">
                 {formatNumber(measurements.length)}
-              </p>
-            </article>
-            <article className="tember-stat-card rounded-2xl border bg-card/90 p-6">
-              <p className="text-sm text-muted-foreground">
+              </dd>
+              </div>
+              <div className="min-w-0 p-5 sm:p-6">
+              <dt className="text-sm text-muted-foreground">
                 {messages.pet.estimatedAgeLatest}
-              </p>
-              <p className="mt-2 font-display text-2xl font-bold text-primary">
+              </dt>
+              <dd className="mt-2 font-display text-xl font-bold leading-7 text-primary">
                 {estimatedAge === undefined
                   ? messages.common.notRecorded
-                  : formatAgeYears(estimatedAge)}
-              </p>
-            </article>
+                  : formatPetAge(estimatedAge, { approximate: !pet.birthDate })}
+              </dd>
+              </div>
+            </dl>
           </div>
         ) : (
           <section className="mt-8 rounded-lg border border-dashed bg-card p-8 text-center">
@@ -1195,6 +1327,48 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
         <div className="mt-6">
           <WeightChart measurements={measurements} />
         </div>
+        <section className="mt-6 overflow-hidden rounded-lg border bg-card shadow-ambient">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b px-5 py-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-secondary-foreground">
+                {messages.pet.careLog}
+              </p>
+              <h2 className="mt-1 font-display text-xl font-bold text-primary">
+                {messages.pet.vaccinationLog}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {messages.pet.vaccinationLogDescription}
+              </p>
+            </div>
+            <Button onClick={() => setVaccinationEditor("new")} variant="outline">
+              <Plus className="mr-2 size-4" />
+              {messages.pet.addVaccination}
+            </Button>
+          </div>
+          {vaccinations.length ? (
+            <div className="divide-y">
+              {[...vaccinations].reverse().map((vaccination) => (
+                <article className="flex min-w-0 items-center gap-3 px-5 py-4" key={vaccination.id}>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-semibold text-primary">{vaccination.name}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{formatCalendarDate(vaccination.administeredAt)}</p>
+                    {vaccination.notes ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{vaccination.notes}</p> : null}
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <Button aria-label={messages.common.edit} onClick={() => setVaccinationEditor(vaccination)} size="icon" variant="ghost">
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button aria-label={messages.common.delete} onClick={() => setVaccinationDeleteTarget(vaccination)} size="icon" variant="ghost">
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="px-5 py-7 text-sm text-muted-foreground">{messages.pet.noVaccinations}</p>
+          )}
+        </section>
         {ordered.length ? (
           <section className="mt-6 min-w-0 max-w-full overflow-hidden rounded-lg border bg-card shadow-ambient">
             <div className="border-b px-5 py-4">
@@ -1243,7 +1417,7 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                               {formatMeasurementListDate(item.measuredAt)}
                             </span>
                             <span className="whitespace-nowrap font-display text-sm font-bold text-primary">
-                              {formatWeight(item.weightGram, "g")}
+                              {formatDisplayWeight(item.weightGram)}
                             </span>
                             <span
                               className={cn(
@@ -1299,6 +1473,20 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                                 </dl>
                               ) : null}
 
+                              {change ? (
+                                <div className={cn("mt-3", dimensions.length && "border-t pt-3")}>
+                                  <p className="text-xs text-muted-foreground">
+                                    {messages.measurement.changeFromPrevious}
+                                  </p>
+                                  <div className="mt-1">
+                                    <WeightChange
+                                      previousWeightGram={change.previousWeightGram}
+                                      weightGram={item.weightGram}
+                                    />
+                                  </div>
+                                </div>
+                              ) : null}
+
                               {item.notes ? (
                                 <div
                                   className={cn(dimensions.length && "mt-3")}
@@ -1343,6 +1531,7 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                   <tr>
                     <th className="px-5 py-3">{messages.measurement.date}</th>
                     <th className="px-5 py-3">{messages.measurement.weight}</th>
+                    <th className="px-5 py-3">{messages.measurement.changeFromPrevious}</th>
                     <th className="px-5 py-3">
                       {messages.measurement.shellLength}
                     </th>
@@ -1358,13 +1547,26 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {ordered.map((item) => (
-                    <tr className="border-t" key={item.id}>
+                  {ordered.map((item, index) => {
+                    const change = changesByMeasurementId.get(item.id);
+                    return (
+                    <tr className={cn("border-t", index === 0 && "bg-emerald-50/55")} key={item.id}>
                       <td className="px-5 py-4 font-medium">
                         {formatCalendarDate(item.measuredAt)}
                       </td>
                       <td className="px-5 py-4">
-                        {formatWeight(item.weightGram, "g")}
+                        {formatDisplayWeight(item.weightGram)}
+                      </td>
+                      <td className="px-5 py-4">
+                        {change ? (
+                          <WeightChange
+                            compact
+                            previousWeightGram={change.previousWeightGram}
+                            weightGram={item.weightGram}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">{messages.common.notRecordedShort}</span>
+                        )}
                       </td>
                       {(
                         [
@@ -1403,7 +1605,8 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1420,6 +1623,22 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
           }
           onClose={() => setMeasurementEditor(null)}
           petId={petId}
+        />
+      ) : null}
+      {vaccinationEditor ? (
+        <VaccinationForm
+          onClose={() => setVaccinationEditor(null)}
+          petId={petId}
+          vaccination={vaccinationEditor === "new" ? undefined : vaccinationEditor}
+        />
+      ) : null}
+      {vaccinationDeleteTarget ? (
+        <Confirm
+          action={messages.vaccination.deleteConfirm}
+          body={messages.vaccination.deleteBody}
+          onClose={() => setVaccinationDeleteTarget(null)}
+          onConfirm={() => deleteVaccination(vaccinationDeleteTarget.id)}
+          title={messages.vaccination.deleteHeading}
         />
       ) : null}
       {deleteTarget ? (
@@ -1456,9 +1675,11 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
 
 function PetList({
   onOpen,
+  onQuickAdd,
   storageReady,
 }: {
   onOpen: (id: string) => void;
+  onQuickAdd: (id: string) => void;
   storageReady: boolean;
 }) {
   const pets = useLiveQuery(() =>
@@ -1511,52 +1732,77 @@ function PetList({
               const records = measurements
                 .filter((item) => item.petId === pet.id)
                 .sort((a, b) => b.measuredAt.localeCompare(a.measuredAt));
+              const latest = records[0];
+              const previous = records[1];
               return (
                 <article
-                  className="tember-pet-card group rounded-2xl border p-6 transition hover:-translate-y-0.5 hover:shadow-ambient motion-reduce:transform-none"
+                  className="tember-pet-card group overflow-hidden rounded-2xl border transition hover:-translate-y-0.5 hover:shadow-ambient motion-reduce:transform-none"
                   key={pet.id}
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <PetPortrait photoDataUrl={pet.photoDataUrl} />
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {messages.species[pet.species]}
-                    </span>
-                  </div>
-                  <h2 className="mt-5 flex items-center gap-2 font-display text-2xl font-bold text-primary">
-                    <span>{pet.name}</span>
-                    <SexIdentifier
-                      className="font-sans text-xl leading-none"
-                      sex={pet.sex}
-                      showUnknown={false}
-                    />
-                  </h2>
-                  <div className="mt-5 grid grid-cols-2 gap-4 border-y py-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        {messages.dashboard.latest}
-                      </p>
-                      <p className="mt-1 font-display font-semibold">
-                        {records[0]
-                          ? formatWeight(records[0].weightGram, "g")
-                          : messages.common.notRecorded}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        {messages.dashboard.measurementCount}
-                      </p>
-                      <p className="mt-1 font-display font-semibold">
-                        {formatNumber(records.length)}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    className="mt-5 w-full"
+                  <button
+                    aria-label={`${messages.dashboard.openPet}: ${pet.name}`}
+                    className="block w-full p-5 text-left outline-none transition-colors hover:bg-muted/35 focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:p-6"
                     onClick={() => onOpen(pet.id)}
-                    variant="outline"
+                    type="button"
                   >
-                    {messages.dashboard.openPet}
-                  </Button>
+                    <div className="flex items-start justify-between gap-4">
+                      <PetPortrait photoDataUrl={pet.photoDataUrl} />
+                      <span className="max-w-[58%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {messages.species[pet.species]}
+                      </span>
+                    </div>
+                    <h2 className="mt-4 flex min-w-0 items-center gap-2 font-display text-2xl font-bold text-primary">
+                      <span className="truncate">{pet.name}</span>
+                      <SexIdentifier
+                        className="shrink-0 font-sans text-xl leading-none"
+                        sex={pet.sex}
+                        showUnknown={false}
+                      />
+                    </h2>
+                    <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] gap-4 border-y py-4">
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">
+                          {messages.dashboard.latest}
+                        </p>
+                        <p className="mt-1 truncate font-display text-xl font-semibold">
+                          {latest
+                            ? formatDisplayWeight(latest.weightGram)
+                            : messages.common.notRecorded}
+                        </p>
+                        {latest ? (
+                          <div className="mt-1">
+                            <WeightChange
+                              compact
+                              previousWeightGram={previous?.weightGram}
+                              weightGram={latest.weightGram}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">
+                          {messages.dashboard.measurementCount}
+                        </p>
+                        <p className="mt-1 font-display text-xl font-semibold">
+                          {formatNumber(records.length)}
+                        </p>
+                        {latest ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {messages.dashboard.lastRecorded} {formatMeasurementListDate(latest.measuredAt)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </button>
+                  <div className="grid grid-cols-2 gap-3 border-t bg-muted/20 p-4 sm:px-6">
+                    <Button onClick={() => onQuickAdd(pet.id)}>
+                      <Plus className="mr-2 size-4" />
+                      {messages.dashboard.quickAddMeasurement}
+                    </Button>
+                    <Button onClick={() => onOpen(pet.id)} variant="outline">
+                      {messages.dashboard.openPet}
+                    </Button>
+                  </div>
                 </article>
               );
             })}
@@ -1873,6 +2119,7 @@ function SyncLoadingScreen({ checking = false }: { checking?: boolean }) {
 export function TemberApp() {
   const [view, setView] = useState<View>("pets");
   const [petId, setPetId] = useState<string>();
+  const [quickMeasurementPetId, setQuickMeasurementPetId] = useState<string>();
   const [storageReady, setStorageReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>();
   const [initialSyncComplete, setInitialSyncComplete] = useState(false);
@@ -1912,9 +2159,9 @@ export function TemberApp() {
   useEffect(() => {
     if (!storageReady) return;
     let active = true;
-    void Promise.all([db.pets.count(), db.measurements.count()])
-      .then(([petCount, measurementCount]) => {
-        if (active) setHasCachedRecords(petCount + measurementCount > 0);
+    void Promise.all([db.pets.count(), db.measurements.count(), db.vaccinations.count()])
+      .then(([petCount, measurementCount, vaccinationCount]) => {
+        if (active) setHasCachedRecords(petCount + measurementCount + vaccinationCount > 0);
       })
       .catch(() => {
         if (active) setHasCachedRecords(true);
@@ -2039,7 +2286,11 @@ export function TemberApp() {
       {petId ? (
         <PetDetail onBack={() => setPetId(undefined)} petId={petId} />
       ) : view === "pets" ? (
-        <PetList onOpen={setPetId} storageReady={storageReady} />
+        <PetList
+          onOpen={setPetId}
+          onQuickAdd={setQuickMeasurementPetId}
+          storageReady={storageReady}
+        />
       ) : (
         <DataView
           onImported={() => {
@@ -2072,6 +2323,12 @@ export function TemberApp() {
           </button>
         ))}
       </nav>
+      {quickMeasurementPetId ? (
+        <MeasurementForm
+          onClose={() => setQuickMeasurementPetId(undefined)}
+          petId={quickMeasurementPetId}
+        />
+      ) : null}
     </div>
   );
 }

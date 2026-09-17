@@ -4,6 +4,7 @@ import {
   clearAllLocalData,
   createMeasurement,
   createPet,
+  createVaccination,
   db,
   deletePet,
   ensureLocalDatabase,
@@ -11,6 +12,7 @@ import {
 
 afterEach(async () => {
   await db.measurements.clear();
+  await db.vaccinations.clear();
   await db.pets.clear();
   await db.appState.clear();
   await db.tombstones.clear();
@@ -53,11 +55,17 @@ describe("device storage", () => {
       measuredAt: "2026-06-20",
       weightGram: 80,
     });
+    await createVaccination({
+      petId: pet.id,
+      administeredAt: "2026-06-20",
+      name: "Annual vaccine",
+    });
 
     await deletePet(pet.id);
 
     expect(await db.pets.count()).toBe(0);
     expect(await db.measurements.count()).toBe(0);
+    expect(await db.vaccinations.count()).toBe(0);
   });
 
   it("deletes every local pet and measurement", async () => {
@@ -76,10 +84,16 @@ describe("device storage", () => {
       measuredAt: "2026-06-21",
       weightGram: 80,
     });
+    await createVaccination({
+      petId: firstPet.id,
+      administeredAt: "2026-06-21",
+      name: "Annual vaccine",
+    });
 
     await clearAllLocalData();
 
     expect(await db.pets.count()).toBe(0);
     expect(await db.measurements.count()).toBe(0);
+    expect(await db.vaccinations.count()).toBe(0);
   });
 });

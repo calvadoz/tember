@@ -47,6 +47,15 @@ export const measurementDraftSchema = z
   })
   .strict();
 
+export const vaccinationDraftSchema = z
+  .object({
+    petId: z.string().uuid(),
+    administeredAt: calendarDate,
+    name: z.string().trim().min(1).max(160),
+    notes: optionalText,
+  })
+  .strict();
+
 const auditFields = z.object({
   id: z.string().uuid(),
   createdAt: z.string().datetime(),
@@ -57,8 +66,9 @@ export const petSchema = petDraftSchema.extend(auditFields.shape);
 export const measurementSchema = measurementDraftSchema.extend(
   auditFields.shape,
 );
+export const vaccinationSchema = vaccinationDraftSchema.extend(auditFields.shape);
 
-export const backupSchema = z
+const backupV1Schema = z
   .object({
     format: z.literal("shelltrack-backup"),
     version: z.literal(1),
@@ -79,5 +89,44 @@ export const backupSchema = z
       }
     }
   });
+
+const backupV2Schema = z
+  .object({
+    format: z.literal("shelltrack-backup"),
+    version: z.literal(2),
+    exportedAt: z.string().datetime(),
+    pets: z.array(petSchema),
+    measurements: z.array(measurementSchema),
+    vaccinations: z.array(vaccinationSchema),
+  })
+  .strict()
+  .superRefine((backup, context) => {
+    const petIds = new Set(backup.pets.map((pet) => pet.id));
+    for (const measurement of backup.measurements) {
+      if (!petIds.has(measurement.petId)) {
+        context.addIssue({
+          code: "custom",
+          message: "A measurement refers to a pet that is not in this backup.",
+          path: ["measurements", measurement.id, "petId"],
+        });
+      }
+    }
+    for (const vaccination of backup.vaccinations) {
+      if (!petIds.has(vaccination.petId)) {
+        context.addIssue({
+          code: "custom",
+          message: "A vaccination refers to a pet that is not in this backup.",
+          path: ["vaccinations", vaccination.id, "petId"],
+        });
+      }
+    }
+  });
+
+export const backupSchema = z.union([backupV1Schema, backupV2Schema]).transform(
+  (backup) =>
+    backup.version === 1
+      ? { ...backup, version: 2 as const, vaccinations: [] }
+      : backup,
+);
 
 export type Backup = z.infer<typeof backupSchema>;

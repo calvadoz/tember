@@ -1,4 +1,7 @@
 export const significantWeightDropPercent = 10;
+export const notableWeightChangePercent = 3;
+
+export type WeightChangeTone = "positive" | "neutral" | "decrease";
 
 export function weightChangePercent(
   previousWeightGram: number,
@@ -16,4 +19,21 @@ export function isSignificantWeightDrop(
     weightChangePercent(previousWeightGram, currentWeightGram) <=
     -significantWeightDropPercent
   );
+}
+
+export function weightChangeGram(
+  previousWeightGram: number,
+  currentWeightGram: number,
+): number {
+  return currentWeightGram - previousWeightGram;
+}
+
+export function weightChangeTone(
+  previousWeightGram: number,
+  currentWeightGram: number,
+): WeightChangeTone {
+  const change = weightChangePercent(previousWeightGram, currentWeightGram);
+  if (change >= notableWeightChangePercent) return "positive";
+  if (change <= -notableWeightChangePercent) return "decrease";
+  return "neutral";
 }

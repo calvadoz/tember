@@ -5,16 +5,20 @@ import type {
   MeasurementDraft,
   Pet,
   PetDraft,
+  Vaccination,
+  VaccinationDraft,
 } from "@/lib/domain";
 import type { SyncSnapshot, Tombstone } from "@/lib/sync/types";
 import {
   measurementDraftSchema,
   petDraftSchema,
+  vaccinationDraftSchema,
 } from "@/lib/validation/schemas";
 
 class TemberDatabase extends Dexie {
   pets!: EntityTable<Pet, "id">;
   measurements!: EntityTable<Measurement, "id">;
+  vaccinations!: EntityTable<Vaccination, "id">;
   appState!: EntityTable<{ key: string; value: string }, "key">;
   tombstones!: EntityTable<Tombstone, "entityId">;
 
@@ -32,6 +36,13 @@ class TemberDatabase extends Dexie {
     this.version(3).stores({
       pets: "id, name, species, updatedAt",
       measurements: "id, petId, measuredAt, [petId+measuredAt]",
+      appState: "key",
+      tombstones: "entityId, entityType, deletedAt",
+    });
+    this.version(4).stores({
+      pets: "id, name, species, updatedAt",
+      measurements: "id, petId, measuredAt, [petId+measuredAt]",
+      vaccinations: "id, petId, administeredAt, [petId+administeredAt]",
       appState: "key",
       tombstones: "entityId, entityType, deletedAt",
     });
@@ -87,14 +98,41 @@ export async function updatePet(id: string, draft: PetDraft): Promise<void> {
 }
 
 export async function deletePet(id: string): Promise<void> {
-  await db.transaction("rw", db.pets, db.measurements, db.tombstones, async () => {
+  await db.transaction("rw", db.pets, db.measurements, db.vaccinations, db.tombstones, async () => {
     const deletedAt = nowIso();
     const measurements = await db.measurements.where("petId").equals(id).toArray();
+    const vaccinations = await db.vaccinations.where("petId").equals(id).toArray();
     await Promise.all(measurements.map((measurement) => rememberDeletion(measurement.id, "measurement", deletedAt)));
+    await Promise.all(vaccinations.map((vaccination) => rememberDeletion(vaccination.id, "vaccination", deletedAt)));
     await rememberDeletion(id, "pet", deletedAt);
     await db.measurements.where("petId").equals(id).delete();
+    await db.vaccinations.where("petId").equals(id).delete();
     await db.pets.delete(id);
   });
+  notifyLocalChange();
+}
+
+export async function createVaccination(draft: VaccinationDraft): Promise<Vaccination> {
+  const validated = vaccinationDraftSchema.parse(draft);
+  if (!(await db.pets.get(validated.petId))) throw new Error("Pet not found");
+  const timestamp = nowIso();
+  const vaccination: Vaccination = { ...validated, id: crypto.randomUUID(), createdAt: timestamp, updatedAt: timestamp };
+  await db.vaccinations.add(vaccination);
+  notifyLocalChange();
+  return vaccination;
+}
+
+export async function updateVaccination(id: string, draft: VaccinationDraft): Promise<void> {
+  const validated = vaccinationDraftSchema.parse(draft);
+  if (!(await db.pets.get(validated.petId))) throw new Error("Pet not found");
+  const changed = await db.vaccinations.update(id, { ...validated, updatedAt: nowIso() });
+  if (!changed) throw new Error("Vaccination not found");
+  notifyLocalChange();
+}
+
+export async function deleteVaccination(id: string): Promise<void> {
+  await rememberDeletion(id, "vaccination");
+  await db.vaccinations.delete(id);
   notifyLocalChange();
 }
 
@@ -136,30 +174,33 @@ export async function deleteMeasurement(id: string): Promise<void> {
 }
 
 export async function clearAllLocalData(): Promise<void> {
-  await db.transaction("rw", db.pets, db.measurements, db.tombstones, async () => {
+  await db.transaction("rw", db.pets, db.measurements, db.vaccinations, db.tombstones, async () => {
     const deletedAt = nowIso();
-    const [pets, measurements] = await Promise.all([db.pets.toArray(), db.measurements.toArray()]);
+    const [pets, measurements, vaccinations] = await Promise.all([db.pets.toArray(), db.measurements.toArray(), db.vaccinations.toArray()]);
     await Promise.all([
       ...pets.map((pet) => rememberDeletion(pet.id, "pet", deletedAt)),
       ...measurements.map((measurement) => rememberDeletion(measurement.id, "measurement", deletedAt)),
+      ...vaccinations.map((vaccination) => rememberDeletion(vaccination.id, "vaccination", deletedAt)),
     ]);
     await db.measurements.clear();
     await db.pets.clear();
+    await db.vaccinations.clear();
   });
   notifyLocalChange();
 }
 
 export async function getSyncSnapshot(): Promise<SyncSnapshot> {
-  const [pets, measurements, tombstones] = await Promise.all([
+  const [pets, measurements, vaccinations, tombstones] = await Promise.all([
     db.pets.toArray(),
     db.measurements.toArray(),
+    db.vaccinations.toArray(),
     db.tombstones.toArray(),
   ]);
-  return { pets, measurements, tombstones };
+  return { pets, measurements, vaccinations, tombstones };
 }
 
 export async function applyRemoteSnapshot(snapshot: SyncSnapshot): Promise<void> {
-  await db.transaction("rw", db.pets, db.measurements, db.tombstones, async () => {
+  await db.transaction("rw", db.pets, db.measurements, db.vaccinations, db.tombstones, async () => {
     const localTombstones = new Map((await db.tombstones.toArray()).map((item) => [item.entityId, item]));
     for (const tombstone of snapshot.tombstones) {
       const local = localTombstones.get(tombstone.entityId);
@@ -168,8 +209,10 @@ export async function applyRemoteSnapshot(snapshot: SyncSnapshot): Promise<void>
         if (tombstone.entityType === "pet") {
           await db.pets.delete(tombstone.entityId);
           await db.measurements.where("petId").equals(tombstone.entityId).delete();
+          await db.vaccinations.where("petId").equals(tombstone.entityId).delete();
         } else {
-          await db.measurements.delete(tombstone.entityId);
+          if (tombstone.entityType === "measurement") await db.measurements.delete(tombstone.entityId);
+          else await db.vaccinations.delete(tombstone.entityId);
         }
       }
     }
@@ -187,6 +230,13 @@ export async function applyRemoteSnapshot(snapshot: SyncSnapshot): Promise<void>
       const existing = await db.measurements.get(measurement.id);
       if (!existing || existing.updatedAt < measurement.updatedAt) await db.measurements.put(measurement);
       if (tombstone && tombstone.deletedAt < measurement.updatedAt) await db.tombstones.delete(measurement.id);
+    }
+    for (const vaccination of snapshot.vaccinations) {
+      const tombstone = localTombstones.get(vaccination.id);
+      if (tombstone && tombstone.deletedAt >= vaccination.updatedAt) continue;
+      const existing = await db.vaccinations.get(vaccination.id);
+      if (!existing || existing.updatedAt < vaccination.updatedAt) await db.vaccinations.put(vaccination);
+      if (tombstone && tombstone.deletedAt < vaccination.updatedAt) await db.tombstones.delete(vaccination.id);
     }
   });
 }

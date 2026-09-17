@@ -58,8 +58,10 @@ export type Messages = {
     emptyHeading: string;
     emptyBody: string;
     latest: string;
+    lastRecorded: string;
     measurementCount: string;
     openPet: string;
+    quickAddMeasurement: string;
   };
   pet: {
     newHeading: string;
@@ -87,6 +89,7 @@ export type Messages = {
     noMeasurements: string;
     noMeasurementsBody: string;
     latestWeight: string;
+    previousWeight: string;
     history: string;
     chart: string;
     chartDescription: string;
@@ -99,6 +102,11 @@ export type Messages = {
     chartWeightAxisGram: string;
     chartWeightAxisKilogram: string;
     chartExploreHint: string;
+    careLog: string;
+    vaccinationLog: string;
+    vaccinationLogDescription: string;
+    addVaccination: string;
+    noVaccinations: string;
   };
   measurement: {
     newHeading: string;
@@ -115,6 +123,17 @@ export type Messages = {
     showDetails: string;
     hideDetails: string;
     changeFromPrevious: string;
+    noPreviousRecord: string;
+    deleteHeading: string;
+    deleteBody: string;
+    deleteConfirm: string;
+  };
+  vaccination: {
+    newHeading: string;
+    editHeading: string;
+    name: string;
+    date: string;
+    notes: string;
     deleteHeading: string;
     deleteBody: string;
     deleteConfirm: string;

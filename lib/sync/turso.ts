@@ -31,6 +31,8 @@ export async function ensureRemoteSchema(): Promise<Client> {
           "CREATE INDEX IF NOT EXISTS pets_account_id ON pets(account_id)",
           "CREATE TABLE IF NOT EXISTS measurements (id TEXT PRIMARY KEY, account_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT)",
           "CREATE INDEX IF NOT EXISTS measurements_account_id ON measurements(account_id)",
+          "CREATE TABLE IF NOT EXISTS vaccinations (id TEXT PRIMARY KEY, account_id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT)",
+          "CREATE INDEX IF NOT EXISTS vaccinations_account_id ON vaccinations(account_id)",
         ],
         "write",
       )

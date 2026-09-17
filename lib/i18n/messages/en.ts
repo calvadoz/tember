@@ -79,8 +79,10 @@ export const en: Messages = {
     emptyHeading: "Add your first pet",
     emptyBody: "Create a profile, then begin a private measurement history.",
     latest: "Latest weight",
+    lastRecorded: "Last recorded",
     measurementCount: "Measurements",
     openPet: "View journal",
+    quickAddMeasurement: "Add measurement",
   },
   pet: {
     newHeading: "Add a pet",
@@ -109,6 +111,7 @@ export const en: Messages = {
     noMeasurements: "No measurements yet",
     noMeasurementsBody: "Add a date and weight to begin the growth history.",
     latestWeight: "Latest weight",
+    previousWeight: "Previous weight",
     history: "Measurement history",
     chart: "Weight over time",
     chartDescription:
@@ -128,6 +131,11 @@ export const en: Messages = {
     chartWeightAxisKilogram: "Weight in kilograms",
     chartExploreHint:
       "Move, tap, or use the arrow keys to explore each record.",
+    careLog: "Care log",
+    vaccinationLog: "Vaccinations",
+    vaccinationLogDescription: "Keep vaccine names and dates with this pet’s journal.",
+    addVaccination: "Add vaccination",
+    noVaccinations: "No vaccinations recorded yet.",
   },
   measurement: {
     newHeading: "Add measurement",
@@ -144,9 +152,20 @@ export const en: Messages = {
     showDetails: "Show measurement details",
     hideDetails: "Hide measurement details",
     changeFromPrevious: "Change from previous record",
+    noPreviousRecord: "First record",
     deleteHeading: "Delete this measurement?",
     deleteBody: "This removes the measurement from the growth history.",
     deleteConfirm: "Delete measurement",
+  },
+  vaccination: {
+    newHeading: "Add vaccination",
+    editHeading: "Edit vaccination",
+    name: "Vaccine name",
+    date: "Date given",
+    notes: "Notes",
+    deleteHeading: "Delete this vaccination?",
+    deleteBody: "This removes the vaccination from this pet’s care log.",
+    deleteConfirm: "Delete vaccination",
   },
   validation: {
     required: "Enter a value.",

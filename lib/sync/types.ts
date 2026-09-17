@@ -1,14 +1,15 @@
-import type { Measurement, Pet } from "@/lib/domain";
+import type { Measurement, Pet, Vaccination } from "@/lib/domain";
 
 export type Tombstone = {
   entityId: string;
-  entityType: "pet" | "measurement";
+  entityType: "pet" | "measurement" | "vaccination";
   deletedAt: string;
 };
 
 export type SyncSnapshot = {
   pets: Pet[];
   measurements: Measurement[];
+  vaccinations: Vaccination[];
   tombstones: Tombstone[];
 };
 

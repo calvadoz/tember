@@ -11,6 +11,7 @@ import {
 import {
   measurementDraftSchema,
   petDraftSchema,
+  vaccinationDraftSchema,
 } from "@/lib/validation/schemas";
 
 describe("domain rules", () => {
@@ -85,5 +86,14 @@ describe("domain rules", () => {
   it("converts display units to storage units", () => {
     expect(weightToGram(1.25, "kg")).toBe(1250);
     expect(lengthToMm(12.4, "cm")).toBe(124);
+  });
+
+  it("accepts a concise per-pet vaccination record", () => {
+    const result = vaccinationDraftSchema.parse({
+      petId: crypto.randomUUID(),
+      administeredAt: "2026-06-21",
+      name: "FVRCP",
+    });
+    expect(result.name).toBe("FVRCP");
   });
 });

@@ -38,6 +38,20 @@ type Measurement = {
 };
 ```
 
+## Vaccination
+
+```ts
+type Vaccination = {
+  id: string;
+  petId: string;
+  administeredAt: string;
+  name: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
 ## Important rules
 
 - `weightGram` is required, must be a real number, and must be greater than zero.
@@ -48,11 +62,12 @@ type Measurement = {
 - A pet portrait is optional. Selected JPG, PNG, WebP, GIF, or AVIF images up to 4 MB are stored in the device cache, synced as part of the household data, and included in JSON backups.
 - When present, `estimatedAgeYears` is the pet's estimated age at its first measurement. The latest estimate adds elapsed calendar time using a 365.2425-day average year.
 - Deleting a pet must safely handle all measurements linked to that pet in the same action.
+- Vaccinations are a per-pet care log. They record an administration date, vaccine name, and optional notes. Tember does not interpret them as medical advice or schedule treatment.
 - Check imported files before saving anything, and include a format version in exported files.
 
 ## Device cache and shared sync
 
-Each device uses IndexedDB through Dexie for immediate offline reads and writes. JSON imports are fully validated before an atomic replacement transaction. When a shared account is signed in, the device sends its UUID-based snapshot to authenticated Next.js server routes and receives the household snapshot from Turso.
+Each device uses IndexedDB through Dexie for immediate offline reads and writes. JSON imports are fully validated before an atomic replacement transaction. When a shared account is signed in, the device sends its UUID-based pet, measurement, vaccination, and deletion snapshot to authenticated Next.js server routes and receives the household snapshot from Turso.
 
 The first device creates one shared username-and-password account. The second device signs in to the same account. Turso credentials are environment variables available only to server routes. They are never sent to the browser.
 

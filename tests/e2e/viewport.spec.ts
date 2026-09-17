@@ -34,6 +34,13 @@ for (const width of viewportWidths) {
     await expectDocumentInsideViewport(page, "Add measurement");
 
     await page.locator('button[aria-label="Cancel"]').click();
+    await page.getByRole("button", { name: "Add vaccination" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Add vaccination" }),
+    ).toBeVisible();
+    await expectDocumentInsideViewport(page, "Add vaccination");
+
+    await page.locator('button[aria-label="Cancel"]').click();
     await page.getByRole("button", { name: "Data", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Your data" }),

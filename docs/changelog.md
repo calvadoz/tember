@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Refined Tember’s pet journals with adaptive weight display, natural age language, clearer per-record weight changes, tappable pet cards, and dedicated mobile-sized measurement actions.
+- Added a synced, backup-included per-pet vaccination log for vaccine names, dates, and optional notes. It remains separate from growth calculations and does not provide medical advice.
+
 - Reframed Tember’s interface as a private pet growth tracker, with generic optional measurements and common pet types while preserving the existing local storage, age calculation, measurements, import/export, and deletion behavior.
 - Rebuilt the weight chart for dense records: time-range controls, endpoint and significant-drop markers, labelled axes, a selected-record summary, and the existing touch and keyboard explorer now fit without horizontal scrolling.
 - Replaced the first-run seed with the supplied Debbie, Jake, and Mochi backup (310 measurements). New local databases receive it once; existing records are not replaced.

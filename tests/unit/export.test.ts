@@ -24,6 +24,19 @@ describe("portable data", () => {
     });
 
     expect(backup.pets[0].name).toBe("Moss");
+    expect(backup.vaccinations).toEqual([]);
+  });
+
+  it("accepts vaccinations in a version 2 backup", () => {
+    const backup = parseBackup({
+      format: "shelltrack-backup",
+      version: 2,
+      exportedAt: "2026-06-21T08:00:00.000Z",
+      pets: [{ id: petId, name: "Moss", species: "cat", sex: "unknown", createdAt: "2026-06-21T08:00:00.000Z", updatedAt: "2026-06-21T08:00:00.000Z" }],
+      measurements: [],
+      vaccinations: [{ id: "ce0d48f5-c7b4-475a-a2ef-f15787859ed4", petId, administeredAt: "2026-06-21", name: "FVRCP", createdAt: "2026-06-21T08:00:00.000Z", updatedAt: "2026-06-21T08:00:00.000Z" }],
+    });
+    expect(backup.vaccinations[0].name).toBe("FVRCP");
   });
 
   it("escapes CSV notes and leaves absent dimensions empty", () => {
