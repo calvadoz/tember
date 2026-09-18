@@ -53,7 +53,6 @@ export default function OpenGraphImage() {
             display: "flex",
             flexDirection: "column",
             maxWidth: "720px",
-            zIndex: 1,
           }}
         >
           <div style={{ alignItems: "center", display: "flex", gap: "18px" }}>
