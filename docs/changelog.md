@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Added Open Graph and large Twitter card metadata with a branded Tember preview image for shared links.
+
 - Refined Tember’s pet journals with adaptive weight display, natural age language, clearer per-record weight changes, tappable pet cards, and dedicated mobile-sized measurement actions.
 - Added a synced, backup-included per-pet vaccination log for vaccine names, dates, and optional notes. It remains separate from growth calculations and does not provide medical advice.
 

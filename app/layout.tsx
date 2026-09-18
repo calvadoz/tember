@@ -27,6 +27,26 @@ export const metadata: Metadata = {
   },
   description: messages.metadata.description,
   applicationName: messages.common.appName,
+  openGraph: {
+    type: "website",
+    siteName: messages.common.appName,
+    title: messages.metadata.shareTitle,
+    description: messages.metadata.shareDescription,
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: messages.metadata.shareTitle,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: messages.metadata.shareTitle,
+    description: messages.metadata.shareDescription,
+    images: ["/opengraph-image"],
+  },
 };
 
 export const viewport: Viewport = {

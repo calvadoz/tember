@@ -12,7 +12,12 @@ export type Messages = {
     notRecorded: string;
     notRecordedShort: string;
   };
-  metadata: { titleTemplate: string; description: string };
+  metadata: {
+    titleTemplate: string;
+    description: string;
+    shareTitle: string;
+    shareDescription: string;
+  };
   loading: { label: string; status: string };
   home: {
     eyebrow: string;

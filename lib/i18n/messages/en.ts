@@ -15,6 +15,8 @@ export const en: Messages = {
   metadata: {
     titleTemplate: "%s · Tember",
     description: "A private growth journal for the pets in your care.",
+    shareTitle: "Tember · Care, kept close",
+    shareDescription: "A private growth journal for every pet in your care.",
   },
   loading: { label: "Loading Tember", status: "Loading…" },
   home: {
@@ -69,7 +71,8 @@ export const en: Messages = {
     createAccount: "Create account",
     signIn: "Sign in",
     syncReady: "Synced across your devices",
-    syncError: "Tember could not sync right now. Your changes remain on this device.",
+    syncError:
+      "Tember could not sync right now. Your changes remain on this device.",
   },
   dashboard: {
     eyebrow: "Your pets",
@@ -94,7 +97,8 @@ export const en: Messages = {
     replacePhoto: "Replace photo",
     removePhoto: "Remove photo",
     photoPreview: "Pet portrait preview",
-    photoHelp: "JPG, PNG, WebP, GIF, or AVIF up to 4 MB. Included in your shared household sync.",
+    photoHelp:
+      "JPG, PNG, WebP, GIF, or AVIF up to 4 MB. Included in your shared household sync.",
     photoError: "Choose an image up to 4 MB.",
     sex: "Sex",
     birthDate: "Birth date",
@@ -133,7 +137,8 @@ export const en: Messages = {
       "Move, tap, or use the arrow keys to explore each record.",
     careLog: "Care log",
     vaccinationLog: "Vaccinations",
-    vaccinationLogDescription: "Keep vaccine names and dates with this pet’s journal.",
+    vaccinationLogDescription:
+      "Keep vaccine names and dates with this pet’s journal.",
     addVaccination: "Add vaccination",
     noVaccinations: "No vaccinations recorded yet.",
   },
@@ -170,8 +175,7 @@ export const en: Messages = {
   validation: {
     required: "Enter a value.",
     positive: "Enter a number greater than zero.",
-    saveFailed:
-      "Tember could not save this. Check the fields and try again.",
+    saveFailed: "Tember could not save this. Check the fields and try again.",
   },
   data: {
     eyebrow: "Portable records",
@@ -184,8 +188,7 @@ export const en: Messages = {
     exportJson: "Download JSON backup",
     exportCsv: "Download measurements CSV",
     importHeading: "Import",
-    importBody:
-      "Tember checks the complete backup before changing anything.",
+    importBody: "Tember checks the complete backup before changing anything.",
     chooseFile: "Choose JSON backup",
     replaceWarning:
       "Importing replaces every pet and measurement currently in this browser.",
