@@ -38,6 +38,7 @@ import {
   deletePet,
   deleteVaccination,
   ensureLocalDatabase,
+  hasPendingSync,
   updateMeasurement,
   updatePet,
   updateVaccination,
@@ -181,7 +182,9 @@ function SexIdentifier({
   showUnknown?: boolean;
 }) {
   if (sex === "unknown") {
-    return showUnknown ? <span className={className}>{messages.sex.unknown}</span> : null;
+    return showUnknown ? (
+      <span className={className}>{messages.sex.unknown}</span>
+    ) : null;
   }
 
   const colorClass = sex === "female" ? "text-[#c45a7a]" : "text-[#3f78aa]";
@@ -229,9 +232,17 @@ function WeightChange({
         className,
       )}
     >
-      <span>{formatWeightChange(weightChangeGram(previousWeightGram, weightGram))}</span>
-      <span className="font-normal text-current/80">
-        ({formatNumber(percent / 100, { maximumFractionDigits: 1, signDisplay: "always", style: "percent" })})
+      <span>
+        {formatWeightChange(weightChangeGram(previousWeightGram, weightGram))}
+      </span>
+      <span className="text-current/80 font-normal">
+        (
+        {formatNumber(percent / 100, {
+          maximumFractionDigits: 1,
+          signDisplay: "always",
+          style: "percent",
+        })}
+        )
       </span>
     </span>
   );
@@ -751,11 +762,20 @@ function VaccinationForm({
   return (
     <Modal
       onClose={onClose}
-      title={vaccination ? messages.vaccination.editHeading : messages.vaccination.newHeading}
+      title={
+        vaccination
+          ? messages.vaccination.editHeading
+          : messages.vaccination.newHeading
+      }
     >
       <form className="mt-6 grid gap-5" onSubmit={submit}>
         <Field label={messages.vaccination.name}>
-          <input className={inputClass} defaultValue={vaccination?.name} name="name" required />
+          <input
+            className={inputClass}
+            defaultValue={vaccination?.name}
+            name="name"
+            required
+          />
         </Field>
         <Field label={messages.vaccination.date}>
           <input
@@ -766,13 +786,29 @@ function VaccinationForm({
             type="date"
           />
         </Field>
-        <Field label={messages.vaccination.notes} hint={messages.common.optional}>
-          <textarea className={cn(inputClass, "min-h-28 resize-y")} defaultValue={vaccination?.notes} name="notes" rows={4} />
+        <Field
+          label={messages.vaccination.notes}
+          hint={messages.common.optional}
+        >
+          <textarea
+            className={cn(inputClass, "min-h-28 resize-y")}
+            defaultValue={vaccination?.notes}
+            name="notes"
+            rows={4}
+          />
         </Field>
-        {error ? <p className="text-sm font-medium text-red-800" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="text-sm font-medium text-red-800" role="alert">
+            {error}
+          </p>
+        ) : null}
         <div className="flex flex-wrap justify-end gap-3 border-t pt-5">
-          <Button onClick={onClose} type="button" variant="outline">{messages.common.cancel}</Button>
-          <Button disabled={saving} type="submit">{messages.common.save}</Button>
+          <Button onClick={onClose} type="button" variant="outline">
+            {messages.common.cancel}
+          </Button>
+          <Button disabled={saving} type="submit">
+            {messages.common.save}
+          </Button>
         </div>
       </form>
     </Modal>
@@ -829,7 +865,10 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
   const chartContainer = useRef<HTMLDivElement>(null);
   const chartSvg = useRef<SVGSVGElement>(null);
   const ordered = useMemo(
-    () => [...measurements].sort((a, b) => a.measuredAt.localeCompare(b.measuredAt)),
+    () =>
+      [...measurements].sort((a, b) =>
+        a.measuredAt.localeCompare(b.measuredAt),
+      ),
     [measurements],
   );
   const visibleMeasurements = useMemo(() => {
@@ -885,8 +924,11 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
   const dateRange = dateValues[dateValues.length - 1] - dateMinimum || 1;
   const weightUnit = yMaximum >= 1000 ? "kg" : "g";
   const points = visibleMeasurements.map((measurement, index) => {
-    const x = margin.left + ((dateValues[index] - dateMinimum) / dateRange) * plotWidth;
-    const y = margin.top + (1 - (measurement.weightGram - yMinimum) / yRange) * plotHeight;
+    const x =
+      margin.left + ((dateValues[index] - dateMinimum) / dateRange) * plotWidth;
+    const y =
+      margin.top +
+      (1 - (measurement.weightGram - yMinimum) / yRange) * plotHeight;
     const previous = visibleMeasurements[index - 1];
     return {
       measurement,
@@ -901,7 +943,9 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
     };
   });
   const linePath = points
-    .map((point, index) => (index === 0 ? "M " : "L ") + point.x + " " + point.y)
+    .map(
+      (point, index) => (index === 0 ? "M " : "L ") + point.x + " " + point.y,
+    )
     .join(" ");
   const baseline = margin.top + plotHeight;
   const areaPath =
@@ -919,7 +963,9 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
   const dateLabelIndexes = Array.from(
     new Set(
       Array.from({ length: labelCount }, (_, index) =>
-        Math.round((index * (visibleMeasurements.length - 1)) / (labelCount - 1)),
+        Math.round(
+          (index * (visibleMeasurements.length - 1)) / (labelCount - 1),
+        ),
       ),
     ),
   );
@@ -944,7 +990,10 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
     if (!svg) return;
     const bounds = svg.getBoundingClientRect();
     const svgX = ((clientX - bounds.left) / bounds.width) * chartWidth;
-    const targetX = Math.min(chartWidth - margin.right, Math.max(margin.left, svgX));
+    const targetX = Math.min(
+      chartWidth - margin.right,
+      Math.max(margin.left, svgX),
+    );
     const nearest = points.reduce(
       (closest, point, index) =>
         Math.abs(point.x - targetX) < closest.distance
@@ -1046,24 +1095,53 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
         >
           <defs>
             <linearGradient id="weightArea" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="hsl(var(--secondary))" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="hsl(var(--secondary))" stopOpacity="0.02" />
+              <stop
+                offset="0%"
+                stopColor="hsl(var(--secondary))"
+                stopOpacity="0.22"
+              />
+              <stop
+                offset="100%"
+                stopColor="hsl(var(--secondary))"
+                stopOpacity="0.02"
+              />
             </linearGradient>
           </defs>
           {yTicks.map((tick) => {
-            const y = margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
+            const y =
+              margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
             return (
-              <line className="stroke-border/70" key={tick} strokeDasharray="3 5" x1={margin.left} x2={chartWidth - margin.right} y1={y} y2={y} />
+              <line
+                className="stroke-border/70"
+                key={tick}
+                strokeDasharray="3 5"
+                x1={margin.left}
+                x2={chartWidth - margin.right}
+                y1={y}
+                y2={y}
+              />
             );
           })}
           {dateLabelIndexes.map((index) => {
             const point = points[index];
             return (
               <g key={point.measurement.id}>
-                <line className="stroke-border/50" x1={point.x} x2={point.x} y1={baseline} y2={baseline + 5} />
+                <line
+                  className="stroke-border/50"
+                  x1={point.x}
+                  x2={point.x}
+                  y1={baseline}
+                  y2={baseline + 5}
+                />
                 <text
                   className="fill-muted-foreground text-[11px]"
-                  textAnchor={index === 0 ? "start" : index === visibleMeasurements.length - 1 ? "end" : "middle"}
+                  textAnchor={
+                    index === 0
+                      ? "start"
+                      : index === visibleMeasurements.length - 1
+                        ? "end"
+                        : "middle"
+                  }
                   x={point.x}
                   y={baseline + 21}
                 >
@@ -1081,17 +1159,39 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
             {messages.pet.chartDateAxis}
           </text>
           <path className="chart-area" d={areaPath} fill="url(#weightArea)" />
-          <path className="chart-line fill-none stroke-primary" d={linePath} pathLength="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+          <path
+            className="chart-line fill-none stroke-primary"
+            d={linePath}
+            pathLength="1"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.5"
+          />
           {points.map((point, index) => {
             if (!point.significantDrop || index === 0) return null;
             const previous = points[index - 1];
-            return <line className="chart-line stroke-red-700" key={"drop-" + point.measurement.id} pathLength="1" strokeLinecap="round" strokeWidth="3.5" x1={previous.x} x2={point.x} y1={previous.y} y2={point.y} />;
+            return (
+              <line
+                className="chart-line stroke-red-700"
+                key={"drop-" + point.measurement.id}
+                pathLength="1"
+                strokeLinecap="round"
+                strokeWidth="3.5"
+                x1={previous.x}
+                x2={point.x}
+                y1={previous.y}
+                y2={point.y}
+              />
+            );
           })}
           {points.map((point, index) =>
             markerIndexes.has(index) ? (
               <circle
                 aria-hidden="true"
-                className={cn("chart-point pointer-events-none stroke-card stroke-2", point.significantDrop ? "fill-red-700" : "fill-primary")}
+                className={cn(
+                  "chart-point pointer-events-none stroke-card stroke-2",
+                  point.significantDrop ? "fill-red-700" : "fill-primary",
+                )}
                 cx={point.x}
                 cy={point.y}
                 key={point.measurement.id}
@@ -1104,7 +1204,11 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
             aria-valuemax={points.length}
             aria-valuemin={1}
             aria-valuenow={activeIndex + 1}
-            aria-valuetext={formatCalendarDate(activePoint.measurement.measuredAt) + ", " + formatDisplayWeight(activePoint.measurement.weightGram)}
+            aria-valuetext={
+              formatCalendarDate(activePoint.measurement.measuredAt) +
+              ", " +
+              formatDisplayWeight(activePoint.measurement.weightGram)
+            }
             className="cursor-crosshair fill-transparent outline-none focus:stroke-primary/35"
             height={plotHeight}
             onKeyDown={handleChartKeyDown}
@@ -1116,25 +1220,58 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
             x={margin.left}
             y={margin.top}
           />
-          <line aria-hidden="true" className="pointer-events-none stroke-secondary/45" strokeDasharray="3 4" x1={activePoint.x} x2={activePoint.x} y1={margin.top} y2={baseline} />
+          <line
+            aria-hidden="true"
+            className="pointer-events-none stroke-secondary/45"
+            strokeDasharray="3 4"
+            x1={activePoint.x}
+            x2={activePoint.x}
+            y1={margin.top}
+            y2={baseline}
+          />
           <circle
             aria-hidden="true"
-            className={cn("pointer-events-none stroke-card stroke-[3]", activePoint.significantDrop ? "fill-red-700" : "fill-primary")}
+            className={cn(
+              "pointer-events-none stroke-card stroke-[3]",
+              activePoint.significantDrop ? "fill-red-700" : "fill-primary",
+            )}
             cx={activePoint.x}
             cy={activePoint.y}
             r="6"
           />
-          <g className="pointer-events-none" transform={"translate(" + tooltipX + " " + tooltipY + ")"}>
-            <rect fill="hsl(var(--primary))" height={tooltipHeight} rx="8" width={tooltipWidth} />
-            <text fill="hsl(var(--primary-foreground))" fontSize="11" x="12" y="19">
+          <g
+            className="pointer-events-none"
+            transform={"translate(" + tooltipX + " " + tooltipY + ")"}
+          >
+            <rect
+              fill="hsl(var(--primary))"
+              height={tooltipHeight}
+              rx="8"
+              width={tooltipWidth}
+            />
+            <text
+              fill="hsl(var(--primary-foreground))"
+              fontSize="11"
+              x="12"
+              y="19"
+            >
               {formatCalendarDate(activePoint.measurement.measuredAt)}
             </text>
-            <text fill="hsl(var(--primary-foreground))" fontSize="13" fontWeight="700" x="12" y="38">
+            <text
+              fill="hsl(var(--primary-foreground))"
+              fontSize="13"
+              fontWeight="700"
+              x="12"
+              y="38"
+            >
               {formatDisplayWeight(activePoint.measurement.weightGram)}
             </text>
             {activePoint.significantDrop ? (
               <text fill="#fecaca" fontSize="11" fontWeight="600" x="12" y="54">
-                {formatNumber(activePoint.changePercent, { maximumFractionDigits: 1 })}%
+                {formatNumber(activePoint.changePercent, {
+                  maximumFractionDigits: 1,
+                })}
+                %
               </text>
             ) : null}
           </g>
@@ -1145,9 +1282,16 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
           viewBox={"0 0 " + chartWidth + " " + chartHeight}
         >
           {yTicks.map((tick) => {
-            const y = margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
+            const y =
+              margin.top + (1 - (tick - yMinimum) / yRange) * plotHeight;
             return (
-              <text className="fill-muted-foreground text-[11px]" key={tick} textAnchor="end" x={margin.left - 10} y={y + 4}>
+              <text
+                className="fill-muted-foreground text-[11px]"
+                key={tick}
+                textAnchor="end"
+                x={margin.left - 10}
+                y={y + 4}
+              >
                 {formatWeight(tick, weightUnit)}
               </text>
             );
@@ -1159,7 +1303,9 @@ export function WeightChart({ measurements }: { measurements: Measurement[] }) {
             x={16}
             y={margin.top + plotHeight / 2}
           >
-            {weightUnit === "kg" ? messages.pet.chartWeightAxisKilogram : messages.pet.chartWeightAxisGram}
+            {weightUnit === "kg"
+              ? messages.pet.chartWeightAxisKilogram
+              : messages.pet.chartWeightAxisGram}
           </text>
         </svg>
       </div>
@@ -1176,7 +1322,8 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
     ) ?? [];
   const vaccinations =
     useLiveQuery(
-      () => db.vaccinations.where("petId").equals(petId).sortBy("administeredAt"),
+      () =>
+        db.vaccinations.where("petId").equals(petId).sortBy("administeredAt"),
       [petId],
     ) ?? [];
   const [petEditor, setPetEditor] = useState(false);
@@ -1187,8 +1334,11 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
     null,
   );
   const [expandedMeasurementId, setExpandedMeasurementId] = useState<string>();
-  const [vaccinationEditor, setVaccinationEditor] = useState<Vaccination | "new" | null>(null);
-  const [vaccinationDeleteTarget, setVaccinationDeleteTarget] = useState<Vaccination | null>(null);
+  const [vaccinationEditor, setVaccinationEditor] = useState<
+    Vaccination | "new" | null
+  >(null);
+  const [vaccinationDeleteTarget, setVaccinationDeleteTarget] =
+    useState<Vaccination | null>(null);
   if (!pet) return null;
   const ordered = [...measurements].reverse();
   const chronological = [...measurements].sort((a, b) =>
@@ -1238,15 +1388,15 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
           <div className="flex items-center gap-4">
             <PetPortrait photoDataUrl={pet.photoDataUrl} size="regular" />
             <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
-              {messages.species[pet.species]}
-            </p>
-            <h1 className="mt-2 font-display text-4xl font-bold text-primary">
-              {pet.name}
-            </h1>
-            <p className="mt-2 text-2xl leading-none text-muted-foreground">
-              <SexIdentifier sex={pet.sex} />
-            </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-foreground">
+                {messages.species[pet.species]}
+              </p>
+              <h1 className="mt-2 font-display text-4xl font-bold text-primary">
+                {pet.name}
+              </h1>
+              <p className="mt-2 text-2xl leading-none text-muted-foreground">
+                <SexIdentifier sex={pet.sex} />
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1281,11 +1431,15 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                 {formatCalendarDate(latest.measuredAt)}
               </p>
               <div className="mt-3 border-t border-white/15 pt-3">
-                <p className="text-xs opacity-75">{messages.measurement.changeFromPrevious}</p>
+                <p className="text-xs opacity-75">
+                  {messages.measurement.changeFromPrevious}
+                </p>
                 <div className="mt-1">
                   <WeightChange
                     className="text-white [&_span:last-child]:text-white/70"
-                    previousWeightGram={changesByMeasurementId.get(latest.id)?.previousWeightGram}
+                    previousWeightGram={
+                      changesByMeasurementId.get(latest.id)?.previousWeightGram
+                    }
                     weightGram={latest.weightGram}
                   />
                 </div>
@@ -1293,22 +1447,24 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
             </article>
             <dl className="tember-stat-card grid grid-cols-2 divide-x rounded-2xl border bg-card/90">
               <div className="p-5 sm:p-6">
-              <dt className="text-sm text-muted-foreground">
-                {messages.dashboard.measurementCount}
-              </dt>
-              <dd className="mt-2 font-display text-3xl font-bold text-primary">
-                {formatNumber(measurements.length)}
-              </dd>
+                <dt className="text-sm text-muted-foreground">
+                  {messages.dashboard.measurementCount}
+                </dt>
+                <dd className="mt-2 font-display text-3xl font-bold text-primary">
+                  {formatNumber(measurements.length)}
+                </dd>
               </div>
               <div className="min-w-0 p-5 sm:p-6">
-              <dt className="text-sm text-muted-foreground">
-                {messages.pet.estimatedAgeLatest}
-              </dt>
-              <dd className="mt-2 font-display text-xl font-bold leading-7 text-primary">
-                {estimatedAge === undefined
-                  ? messages.common.notRecorded
-                  : formatPetAge(estimatedAge, { approximate: !pet.birthDate })}
-              </dd>
+                <dt className="text-sm text-muted-foreground">
+                  {messages.pet.estimatedAgeLatest}
+                </dt>
+                <dd className="mt-2 font-display text-xl font-bold leading-7 text-primary">
+                  {estimatedAge === undefined
+                    ? messages.common.notRecorded
+                    : formatPetAge(estimatedAge, {
+                        approximate: !pet.birthDate,
+                      })}
+                </dd>
               </div>
             </dl>
           </div>
@@ -1339,7 +1495,10 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                 {messages.pet.vaccinationLogDescription}
               </p>
             </div>
-            <Button onClick={() => setVaccinationEditor("new")} variant="outline">
+            <Button
+              onClick={() => setVaccinationEditor("new")}
+              variant="outline"
+            >
               <Plus className="mr-2 size-4" />
               {messages.pet.addVaccination}
             </Button>
@@ -1347,17 +1506,38 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
           {vaccinations.length ? (
             <div className="divide-y">
               {[...vaccinations].reverse().map((vaccination) => (
-                <article className="flex min-w-0 items-center gap-3 px-5 py-4" key={vaccination.id}>
+                <article
+                  className="flex min-w-0 items-center gap-3 px-5 py-4"
+                  key={vaccination.id}
+                >
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-semibold text-primary">{vaccination.name}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{formatCalendarDate(vaccination.administeredAt)}</p>
-                    {vaccination.notes ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{vaccination.notes}</p> : null}
+                    <h3 className="truncate font-semibold text-primary">
+                      {vaccination.name}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {formatCalendarDate(vaccination.administeredAt)}
+                    </p>
+                    {vaccination.notes ? (
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {vaccination.notes}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <Button aria-label={messages.common.edit} onClick={() => setVaccinationEditor(vaccination)} size="icon" variant="ghost">
+                    <Button
+                      aria-label={messages.common.edit}
+                      onClick={() => setVaccinationEditor(vaccination)}
+                      size="icon"
+                      variant="ghost"
+                    >
                       <Pencil className="size-4" />
                     </Button>
-                    <Button aria-label={messages.common.delete} onClick={() => setVaccinationDeleteTarget(vaccination)} size="icon" variant="ghost">
+                    <Button
+                      aria-label={messages.common.delete}
+                      onClick={() => setVaccinationDeleteTarget(vaccination)}
+                      size="icon"
+                      variant="ghost"
+                    >
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
@@ -1365,7 +1545,9 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
               ))}
             </div>
           ) : (
-            <p className="px-5 py-7 text-sm text-muted-foreground">{messages.pet.noVaccinations}</p>
+            <p className="px-5 py-7 text-sm text-muted-foreground">
+              {messages.pet.noVaccinations}
+            </p>
           )}
         </section>
         {ordered.length ? (
@@ -1473,13 +1655,20 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                               ) : null}
 
                               {change ? (
-                                <div className={cn("mt-3", dimensions.length && "border-t pt-3")}>
+                                <div
+                                  className={cn(
+                                    "mt-3",
+                                    dimensions.length && "border-t pt-3",
+                                  )}
+                                >
                                   <p className="text-xs text-muted-foreground">
                                     {messages.measurement.changeFromPrevious}
                                   </p>
                                   <div className="mt-1">
                                     <WeightChange
-                                      previousWeightGram={change.previousWeightGram}
+                                      previousWeightGram={
+                                        change.previousWeightGram
+                                      }
                                       weightGram={item.weightGram}
                                     />
                                   </div>
@@ -1530,7 +1719,9 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                   <tr>
                     <th className="px-5 py-3">{messages.measurement.date}</th>
                     <th className="px-5 py-3">{messages.measurement.weight}</th>
-                    <th className="px-5 py-3">{messages.measurement.changeFromPrevious}</th>
+                    <th className="px-5 py-3">
+                      {messages.measurement.changeFromPrevious}
+                    </th>
                     <th className="px-5 py-3">
                       {messages.measurement.shellLength}
                     </th>
@@ -1549,61 +1740,69 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                   {ordered.map((item, index) => {
                     const change = changesByMeasurementId.get(item.id);
                     return (
-                    <tr className={cn("border-t", index === 0 && "bg-emerald-50/55")} key={item.id}>
-                      <td className="px-5 py-4 font-medium">
-                        {formatCalendarDate(item.measuredAt)}
-                      </td>
-                      <td className="px-5 py-4">
-                        {formatDisplayWeight(item.weightGram)}
-                      </td>
-                      <td className="px-5 py-4">
-                        {change ? (
-                          <WeightChange
-                            compact
-                            previousWeightGram={change.previousWeightGram}
-                            weightGram={item.weightGram}
-                          />
-                        ) : (
-                          <span className="text-muted-foreground">{messages.common.notRecordedShort}</span>
+                      <tr
+                        className={cn(
+                          "border-t",
+                          index === 0 && "bg-emerald-50/55",
                         )}
-                      </td>
-                      {(
-                        [
-                          item.shellLengthMm,
-                          item.shellWidthMm,
-                          item.shellHeightMm,
-                        ] as const
-                      ).map((value, index) => (
-                        <td
-                          className="px-5 py-4 text-muted-foreground"
-                          key={index}
-                        >
-                          {value === undefined
-                            ? messages.common.notRecordedShort
-                            : formatLength(value, "mm")}
+                        key={item.id}
+                      >
+                        <td className="px-5 py-4 font-medium">
+                          {formatCalendarDate(item.measuredAt)}
                         </td>
-                      ))}
-                      <td className="sticky right-0 bg-card px-5 py-4 shadow-[-8px_0_16px_rgba(27,48,34,0.05)]">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            aria-label={messages.common.edit}
-                            onClick={() => setMeasurementEditor(item)}
-                            size="icon"
-                            variant="ghost"
+                        <td className="px-5 py-4">
+                          {formatDisplayWeight(item.weightGram)}
+                        </td>
+                        <td className="px-5 py-4">
+                          {change ? (
+                            <WeightChange
+                              compact
+                              previousWeightGram={change.previousWeightGram}
+                              weightGram={item.weightGram}
+                            />
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {messages.common.notRecordedShort}
+                            </span>
+                          )}
+                        </td>
+                        {(
+                          [
+                            item.shellLengthMm,
+                            item.shellWidthMm,
+                            item.shellHeightMm,
+                          ] as const
+                        ).map((value, index) => (
+                          <td
+                            className="px-5 py-4 text-muted-foreground"
+                            key={index}
                           >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            aria-label={messages.common.delete}
-                            onClick={() => setDeleteTarget(item)}
-                            size="icon"
-                            variant="ghost"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
+                            {value === undefined
+                              ? messages.common.notRecordedShort
+                              : formatLength(value, "mm")}
+                          </td>
+                        ))}
+                        <td className="sticky right-0 bg-card px-5 py-4 shadow-[-8px_0_16px_rgba(27,48,34,0.05)]">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              aria-label={messages.common.edit}
+                              onClick={() => setMeasurementEditor(item)}
+                              size="icon"
+                              variant="ghost"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              aria-label={messages.common.delete}
+                              onClick={() => setDeleteTarget(item)}
+                              size="icon"
+                              variant="ghost"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -1628,7 +1827,9 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
         <VaccinationForm
           onClose={() => setVaccinationEditor(null)}
           petId={petId}
-          vaccination={vaccinationEditor === "new" ? undefined : vaccinationEditor}
+          vaccination={
+            vaccinationEditor === "new" ? undefined : vaccinationEditor
+          }
         />
       ) : null}
       {vaccinationDeleteTarget ? (
@@ -1681,13 +1882,14 @@ function PetList({
   onQuickAdd: (id: string) => void;
   storageReady: boolean;
 }) {
-  const pets = useLiveQuery(() =>
-    db.pets.orderBy("updatedAt").reverse().toArray(),
+  const pets = useLiveQuery(
+    () => db.pets.orderBy("updatedAt").reverse().toArray(),
     [storageReady],
   );
-  const measurements = useLiveQuery(() => db.measurements.toArray(), [
-    storageReady,
-  ]);
+  const measurements = useLiveQuery(
+    () => db.measurements.toArray(),
+    [storageReady],
+  );
   const [editing, setEditing] = useState(false);
   const loading =
     !storageReady || pets === undefined || measurements === undefined;
@@ -1787,7 +1989,8 @@ function PetList({
                         </p>
                         {latest ? (
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {messages.dashboard.lastRecorded} {formatMeasurementListDate(latest.measuredAt)}
+                            {messages.dashboard.lastRecorded}{" "}
+                            {formatMeasurementListDate(latest.measuredAt)}
                           </p>
                         ) : null}
                       </div>
@@ -2065,9 +2268,14 @@ function SyncAccountScreen({
               required
             />
           </Field>
-          <Field label={messages.sync.password} hint={messages.sync.passwordHelp}>
+          <Field
+            label={messages.sync.password}
+            hint={messages.sync.passwordHelp}
+          >
             <input
-              autoComplete={creatingAccount ? "new-password" : "current-password"}
+              autoComplete={
+                creatingAccount ? "new-password" : "current-password"
+              }
               className={inputClass}
               minLength={12}
               name="password"
@@ -2082,9 +2290,7 @@ function SyncAccountScreen({
           </p>
         ) : null}
         <Button className="mt-7 w-full" disabled={saving} type="submit">
-          {creatingAccount
-            ? messages.sync.createAccount
-            : messages.sync.signIn}
+          {creatingAccount ? messages.sync.createAccount : messages.sync.signIn}
         </Button>
       </form>
     </main>
@@ -2095,7 +2301,9 @@ function SyncLoadingScreen({ checking = false }: { checking?: boolean }) {
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-5 py-10">
       <section
-        aria-label={checking ? messages.sync.checkingLabel : messages.sync.loadingLabel}
+        aria-label={
+          checking ? messages.sync.checkingLabel : messages.sync.loadingLabel
+        }
         aria-live="polite"
         className="grid w-full max-w-md justify-items-center rounded-2xl border bg-card p-8 text-center shadow-ambient sm:p-10"
         role="status"
@@ -2105,7 +2313,9 @@ function SyncLoadingScreen({ checking = false }: { checking?: boolean }) {
           {messages.sync.setupEyebrow}
         </p>
         <h1 className="mt-2 font-display text-3xl font-bold text-primary">
-          {checking ? messages.sync.checkingHeading : messages.sync.loadingHeading}
+          {checking
+            ? messages.sync.checkingHeading
+            : messages.sync.loadingHeading}
         </h1>
         <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
           {checking ? messages.sync.checkingBody : messages.sync.loadingBody}
@@ -2123,6 +2333,7 @@ export function TemberApp() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>();
   const [initialSyncComplete, setInitialSyncComplete] = useState(false);
   const [hasCachedRecords, setHasCachedRecords] = useState<boolean>();
+  const [syncError, setSyncError] = useState<string>();
   const initialMergeRequested = useRef(false);
   useEffect(() => {
     let active = true;
@@ -2158,9 +2369,16 @@ export function TemberApp() {
   useEffect(() => {
     if (!storageReady) return;
     let active = true;
-    void Promise.all([db.pets.count(), db.measurements.count(), db.vaccinations.count()])
+    void Promise.all([
+      db.pets.count(),
+      db.measurements.count(),
+      db.vaccinations.count(),
+    ])
       .then(([petCount, measurementCount, vaccinationCount]) => {
-        if (active) setHasCachedRecords(petCount + measurementCount + vaccinationCount > 0);
+        if (active)
+          setHasCachedRecords(
+            petCount + measurementCount + vaccinationCount > 0,
+          );
       })
       .catch(() => {
         if (active) setHasCachedRecords(true);
@@ -2176,14 +2394,25 @@ export function TemberApp() {
       return;
     }
     let syncing = false;
+    let uploadQueued = false;
     let active = true;
     const sync = async () => {
-      if (syncing) return;
+      if (syncing) {
+        uploadQueued = true;
+        return;
+      }
       syncing = true;
       try {
         await syncNow();
+        if (active) setSyncError(undefined);
+      } catch {
+        if (active) setSyncError(messages.sync.syncError);
       } finally {
         syncing = false;
+        if (uploadQueued) {
+          uploadQueued = false;
+          void sync();
+        }
       }
     };
     const pullLatest = async () => {
@@ -2191,26 +2420,48 @@ export function TemberApp() {
       syncing = true;
       try {
         await pullLatestSync();
+        if (!(await hasPendingSync()) && active) setSyncError(undefined);
+      } catch {
+        if (active) setSyncError(messages.sync.syncError);
       } finally {
         syncing = false;
+        if (uploadQueued) {
+          uploadQueued = false;
+          void sync();
+        }
       }
     };
-    const requestSync = () => void sync().catch(() => undefined);
-    const requestPullLatest = () => void pullLatest().catch(() => undefined);
-    const initialSync = initialMergeRequested.current ? sync : pullLatest;
+    const requestSync = () => void sync();
+    const requestRefresh = () => {
+      void (async () => {
+        if (document.visibilityState !== "visible") return;
+        if (await hasPendingSync()) await sync();
+        else await pullLatest();
+      })().catch(() => {
+        if (active) setSyncError(messages.sync.syncError);
+      });
+    };
+    const initialMerge = initialMergeRequested.current;
     initialMergeRequested.current = false;
-    void initialSync().catch(() => undefined).finally(() => {
-      if (active) setInitialSyncComplete(true);
-    });
+    void (async () => {
+      if (initialMerge || (await hasPendingSync())) await sync();
+      else await pullLatest();
+    })()
+      .catch(() => {
+        if (active) setSyncError(messages.sync.syncError);
+      })
+      .finally(() => {
+        if (active) setInitialSyncComplete(true);
+      });
     window.addEventListener("tember-local-change", requestSync);
     window.addEventListener("online", requestSync);
-    document.addEventListener("visibilitychange", requestPullLatest);
-    const refreshInterval = window.setInterval(requestPullLatest, 30_000);
+    document.addEventListener("visibilitychange", requestRefresh);
+    const refreshInterval = window.setInterval(requestRefresh, 30_000);
     return () => {
       active = false;
       window.removeEventListener("tember-local-change", requestSync);
       window.removeEventListener("online", requestSync);
-      document.removeEventListener("visibilitychange", requestPullLatest);
+      document.removeEventListener("visibilitychange", requestRefresh);
       window.clearInterval(refreshInterval);
     };
   }, [storageReady, syncStatus?.authenticated]);
@@ -2322,6 +2573,17 @@ export function TemberApp() {
           </button>
         ))}
       </nav>
+      {syncError ? (
+        <div
+          className="fixed inset-x-4 top-4 z-50 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-ambient sm:left-auto sm:right-6 sm:max-w-md"
+          role="alert"
+        >
+          <span className="min-w-0 flex-1">{syncError}</span>
+          <Button onClick={requestSync} size="sm" variant="outline">
+            {messages.sync.syncRetry}
+          </Button>
+        </div>
+      ) : null}
       {quickMeasurementPetId ? (
         <MeasurementForm
           onClose={() => setQuickMeasurementPetId(undefined)}

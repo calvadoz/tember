@@ -1,4 +1,8 @@
-import { applyRemoteSnapshot, getSyncSnapshot } from "@/lib/db/database";
+import {
+  applyRemoteSnapshot,
+  clearPendingSync,
+  getSyncSnapshot,
+} from "@/lib/db/database";
 import type { SyncSnapshot, SyncStatus } from "@/lib/sync/types";
 
 async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -7,7 +11,12 @@ async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "content-type": "application/json", ...init?.headers },
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : "Tember could not sync right now.");
+  if (!response.ok)
+    throw new Error(
+      typeof body.error === "string"
+        ? body.error
+        : "Tember could not sync right now.",
+    );
   return body as T;
 }
 
@@ -15,14 +24,20 @@ export async function getSyncStatus(): Promise<SyncStatus> {
   return jsonRequest<SyncStatus>("/api/sync/status");
 }
 
-export async function createSharedAccount(username: string, password: string): Promise<void> {
+export async function createSharedAccount(
+  username: string,
+  password: string,
+): Promise<void> {
   await jsonRequest("/api/sync/setup", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
 }
 
-export async function signInToSync(username: string, password: string): Promise<void> {
+export async function signInToSync(
+  username: string,
+  password: string,
+): Promise<void> {
   await jsonRequest("/api/sync/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
@@ -40,6 +55,7 @@ export async function syncNow(): Promise<void> {
     body: JSON.stringify(local),
   });
   await applyRemoteSnapshot(remote);
+  await clearPendingSync();
 }
 
 export async function pullLatestSync(): Promise<void> {
@@ -48,5 +64,6 @@ export async function pullLatestSync(): Promise<void> {
 }
 
 export function requestSync(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("tember-local-change"));
+  if (typeof window !== "undefined")
+    window.dispatchEvent(new Event("tember-local-change"));
 }

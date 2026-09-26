@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-26
+
+### Changed
+
+- Made shared sync durable: a local change remains pending until its upload succeeds. Saves made while an initial or background pull is in progress are queued and uploaded afterward, and the app shows a retry prompt if syncing fails.
+
 ## 2026-09-16
 
 ### Changed

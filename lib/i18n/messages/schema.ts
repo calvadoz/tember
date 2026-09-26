@@ -54,6 +54,7 @@ export type Messages = {
     signIn: string;
     syncReady: string;
     syncError: string;
+    syncRetry: string;
   };
   dashboard: {
     eyebrow: string;

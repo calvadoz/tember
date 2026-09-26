@@ -8,6 +8,8 @@ import {
   db,
   deletePet,
   ensureLocalDatabase,
+  clearPendingSync,
+  hasPendingSync,
 } from "@/lib/db";
 
 afterEach(async () => {
@@ -42,6 +44,9 @@ describe("device storage", () => {
     expect(
       (await db.measurements.get(measurement.id))?.shellWidthMm,
     ).toBeUndefined();
+    expect(await hasPendingSync()).toBe(true);
+    await clearPendingSync();
+    expect(await hasPendingSync()).toBe(false);
   });
 
   it("deletes a pet and linked measurements in one action", async () => {

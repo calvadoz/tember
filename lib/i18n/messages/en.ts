@@ -73,6 +73,7 @@ export const en: Messages = {
     syncReady: "Synced across your devices",
     syncError:
       "Tember could not sync right now. Your changes remain on this device.",
+    syncRetry: "Try syncing again",
   },
   dashboard: {
     eyebrow: "Your pets",

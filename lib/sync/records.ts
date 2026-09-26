@@ -19,26 +19,51 @@ function isValidTombstone(value: unknown): value is Tombstone {
   const item = value as Record<string, unknown>;
   return (
     typeof item.entityId === "string" &&
-    (item.entityType === "pet" || item.entityType === "measurement" || item.entityType === "vaccination") &&
+    (item.entityType === "pet" ||
+      item.entityType === "measurement" ||
+      item.entityType === "vaccination") &&
     isIso(item.deletedAt)
   );
 }
 
-function isRecordWithDates(value: unknown): value is Pet | Measurement {
+function isRecordWithDates(
+  value: unknown,
+): value is Pet | Measurement | Vaccination {
   if (!value || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
-  return typeof item.id === "string" && isIso(item.createdAt) && isIso(item.updatedAt);
+  return (
+    typeof item.id === "string" &&
+    isIso(item.createdAt) &&
+    isIso(item.updatedAt)
+  );
 }
 
 export function parseSnapshot(value: unknown): SyncSnapshot | undefined {
   if (!value || typeof value !== "object") return undefined;
   const snapshot = value as Partial<SyncSnapshot>;
-  if (!Array.isArray(snapshot.pets) || !Array.isArray(snapshot.measurements) || !Array.isArray(snapshot.vaccinations) || !Array.isArray(snapshot.tombstones)) return undefined;
-  if (!snapshot.pets.every(isRecordWithDates) || !snapshot.measurements.every(isRecordWithDates) || !snapshot.vaccinations.every(isRecordWithDates) || !snapshot.tombstones.every(isValidTombstone)) return undefined;
+  if (
+    !Array.isArray(snapshot.pets) ||
+    !Array.isArray(snapshot.measurements) ||
+    !Array.isArray(snapshot.vaccinations) ||
+    !Array.isArray(snapshot.tombstones)
+  ) {
+    return undefined;
+  }
+  if (
+    !snapshot.pets.every(isRecordWithDates) ||
+    !snapshot.measurements.every(isRecordWithDates) ||
+    !snapshot.vaccinations.every(isRecordWithDates) ||
+    !snapshot.tombstones.every(isValidTombstone)
+  ) {
+    return undefined;
+  }
   return snapshot as SyncSnapshot;
 }
 
-export async function mergeSnapshot(accountId: string, snapshot: SyncSnapshot): Promise<SyncSnapshot> {
+export async function mergeSnapshot(
+  accountId: string,
+  snapshot: SyncSnapshot,
+): Promise<SyncSnapshot> {
   const database = await ensureRemoteSchema();
   const records = [
     ...snapshot.pets.map((record) => ({ table: "pets" as const, record })),
@@ -55,15 +80,15 @@ export async function mergeSnapshot(accountId: string, snapshot: SyncSnapshot): 
     [
       ...records.map(({ table, record }) => ({
         sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, ?, ?, NULL) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at, deleted_at = NULL WHERE ${table}.account_id = excluded.account_id AND ${table}.updated_at < excluded.updated_at AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.updated_at)`,
-        args: [
-          record.id,
-          accountId,
-          JSON.stringify(record),
-          record.updatedAt,
-        ],
+        args: [record.id, accountId, JSON.stringify(record), record.updatedAt],
       })),
       ...snapshot.tombstones.map((tombstone) => {
-        const table = tombstone.entityType === "pet" ? "pets" : tombstone.entityType === "measurement" ? "measurements" : "vaccinations";
+        const table =
+          tombstone.entityType === "pet"
+            ? "pets"
+            : tombstone.entityType === "measurement"
+              ? "measurements"
+              : "vaccinations";
         return {
           sql: `INSERT INTO ${table} (id, account_id, payload, updated_at, deleted_at) VALUES (?, ?, '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET deleted_at = excluded.deleted_at WHERE ${table}.account_id = excluded.account_id AND (${table}.deleted_at IS NULL OR ${table}.deleted_at < excluded.deleted_at)`,
           args: [
@@ -98,7 +123,9 @@ export async function migrateLegacyPortraits(
       );
       if (!response.ok) return undefined;
       const contentType = response.headers.get("content-type") ?? "image/png";
-      const bytes = Buffer.from(await response.arrayBuffer()).toString("base64");
+      const bytes = Buffer.from(await response.arrayBuffer()).toString(
+        "base64",
+      );
       return {
         ...pet,
         photoDataUrl: `data:${contentType};base64,${bytes}`,
@@ -126,21 +153,47 @@ export async function migrateLegacyPortraits(
 export async function getSnapshot(accountId: string): Promise<SyncSnapshot> {
   const database = await ensureRemoteSchema();
   const [pets, measurements, vaccinations] = await Promise.all([
-    database.execute({ sql: "SELECT payload, deleted_at FROM pets WHERE account_id = ?", args: [accountId] }),
-    database.execute({ sql: "SELECT payload, deleted_at FROM measurements WHERE account_id = ?", args: [accountId] }),
-    database.execute({ sql: "SELECT payload, deleted_at FROM vaccinations WHERE account_id = ?", args: [accountId] }),
+    database.execute({
+      sql: "SELECT payload, deleted_at FROM pets WHERE account_id = ?",
+      args: [accountId],
+    }),
+    database.execute({
+      sql: "SELECT payload, deleted_at FROM measurements WHERE account_id = ?",
+      args: [accountId],
+    }),
+    database.execute({
+      sql: "SELECT payload, deleted_at FROM vaccinations WHERE account_id = ?",
+      args: [accountId],
+    }),
   ]);
-  const toSnapshot = <T extends Pet | Measurement | Vaccination>(rows: typeof pets.rows) => rows.flatMap((row) => {
-    if (row.deleted_at || typeof row.payload !== "string") return [];
-    try { return [JSON.parse(row.payload) as T]; } catch { return []; }
-  });
-  const toTombstones = (rows: typeof pets.rows, entityType: Tombstone["entityType"]) => rows.flatMap((row) =>
-    typeof row.deleted_at === "string" ? [{ entityId: String(row.id), entityType, deletedAt: row.deleted_at }] : [],
-  );
+  const toSnapshot = <T extends Pet | Measurement | Vaccination>(
+    rows: typeof pets.rows,
+  ) =>
+    rows.flatMap((row) => {
+      if (row.deleted_at || typeof row.payload !== "string") return [];
+      try {
+        return [JSON.parse(row.payload) as T];
+      } catch {
+        return [];
+      }
+    });
+  const toTombstones = (
+    rows: typeof pets.rows,
+    entityType: Tombstone["entityType"],
+  ) =>
+    rows.flatMap((row) =>
+      typeof row.deleted_at === "string"
+        ? [{ entityId: String(row.id), entityType, deletedAt: row.deleted_at }]
+        : [],
+    );
   return {
     pets: toSnapshot<Pet>(pets.rows),
     measurements: toSnapshot<Measurement>(measurements.rows),
     vaccinations: toSnapshot<Vaccination>(vaccinations.rows),
-    tombstones: [...toTombstones(pets.rows, "pet"), ...toTombstones(measurements.rows, "measurement"), ...toTombstones(vaccinations.rows, "vaccination")],
+    tombstones: [
+      ...toTombstones(pets.rows, "pet"),
+      ...toTombstones(measurements.rows, "measurement"),
+      ...toTombstones(vaccinations.rows, "vaccination"),
+    ],
   };
 }
