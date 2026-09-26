@@ -14,6 +14,7 @@ import Image from "next/image";
 import {
   ArrowLeft,
   ChevronDown,
+  CloudOff,
   Database,
   Download,
   Leaf,
@@ -2035,10 +2036,14 @@ function PetList({
 
 function DataView({
   onImported,
+  onSyncError,
+  onSyncSuccess,
   onSignedOut,
   syncEnabled,
 }: {
   onImported: () => void;
+  onSyncError: () => void;
+  onSyncSuccess: () => void;
   onSignedOut: () => void;
   syncEnabled: boolean;
 }) {
@@ -2056,8 +2061,10 @@ function DataView({
     try {
       await syncNow();
       setStatus(messages.data.syncSuccess);
+      onSyncSuccess();
     } catch {
       setStatus(messages.sync.syncError);
+      onSyncError();
     } finally {
       setSyncing(false);
     }
@@ -2108,29 +2115,35 @@ function DataView({
             {messages.data.introduction}
           </p>
         </header>
+        {syncEnabled ? (
+          <section className="mt-6 flex flex-col gap-4 rounded-xl border border-primary/15 bg-primary/[0.035] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                <RefreshCw className="size-5" />
+              </span>
+              <div>
+                <h2 className="font-semibold text-primary">
+                  {messages.data.syncHeading}
+                </h2>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                  {messages.data.syncBody}
+                </p>
+              </div>
+            </div>
+            <Button
+              className="shrink-0 sm:self-center"
+              disabled={syncing}
+              onClick={syncThisDevice}
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={cn("mr-2 size-4", syncing && "animate-spin")}
+              />
+              {syncing ? messages.data.syncing : messages.data.syncNow}
+            </Button>
+          </section>
+        ) : null}
         <div className="mt-6 grid gap-5 md:grid-cols-2">
-          {syncEnabled ? (
-            <section className="tember-pet-card rounded-2xl border p-6">
-              <RefreshCw className="size-7 text-secondary" />
-              <h2 className="mt-5 font-display text-xl font-bold text-primary">
-                {messages.data.syncHeading}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {messages.data.syncBody}
-              </p>
-              <Button
-                className="mt-6"
-                disabled={syncing}
-                onClick={syncThisDevice}
-              >
-                <RefreshCw
-                  aria-hidden="true"
-                  className={cn("mr-2 size-4", syncing && "animate-spin")}
-                />
-                {syncing ? messages.data.syncing : messages.data.syncNow}
-              </Button>
-            </section>
-          ) : null}
           {syncEnabled ? (
             <section className="tember-pet-card rounded-2xl border p-6">
               <LogOut className="size-7 text-secondary" />
@@ -2630,6 +2643,8 @@ export function TemberApp() {
             setView("pets");
             setPetId(undefined);
           }}
+          onSyncError={() => setSyncError(messages.sync.syncError)}
+          onSyncSuccess={() => setSyncError(undefined)}
           onSignedOut={() => {
             setInitialSyncComplete(false);
             setSyncError(undefined);
@@ -2665,15 +2680,30 @@ export function TemberApp() {
         ))}
       </nav>
       {syncError ? (
-        <div
-          className="fixed inset-x-4 top-4 z-50 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-ambient sm:left-auto sm:right-6 sm:max-w-md"
+        <aside
+          className="fixed inset-x-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-md items-center gap-3 rounded-full border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950 shadow-ambient lg:bottom-6 lg:left-auto lg:right-6 lg:mx-0"
           role="alert"
         >
-          <span className="min-w-0 flex-1">{syncError}</span>
-          <Button onClick={requestSync} size="sm" variant="outline">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-amber-200/70">
+            <CloudOff aria-hidden="true" className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">
+              {messages.sync.syncAttentionHeading}
+            </span>
+            <span className="block truncate text-xs text-amber-900/80">
+              {messages.sync.syncAttentionBody}
+            </span>
+          </span>
+          <Button
+            className="shrink-0 rounded-full"
+            onClick={requestSync}
+            size="sm"
+            variant="outline"
+          >
             {messages.sync.syncRetry}
           </Button>
-        </div>
+        </aside>
       ) : null}
       {quickMeasurementPetId ? (
         <MeasurementForm

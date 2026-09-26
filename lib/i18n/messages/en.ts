@@ -73,7 +73,9 @@ export const en: Messages = {
     syncReady: "Synced across your devices",
     syncError:
       "Tember could not sync right now. Your changes remain on this device.",
-    syncRetry: "Try syncing again",
+    syncRetry: "Sync now",
+    syncAttentionHeading: "Sync needs attention",
+    syncAttentionBody: "Your changes are safe on this device.",
     signOutHeading: "Sign out of this device",
     signOutBody:
       "This ends the account session here. Your local records stay on this device.",

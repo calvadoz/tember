@@ -55,6 +55,8 @@ export type Messages = {
     syncReady: string;
     syncError: string;
     syncRetry: string;
+    syncAttentionHeading: string;
+    syncAttentionBody: string;
     signOutHeading: string;
     signOutBody: string;
     signOutAction: string;
