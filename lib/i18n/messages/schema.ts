@@ -55,6 +55,11 @@ export type Messages = {
     syncReady: string;
     syncError: string;
     syncRetry: string;
+    signOutHeading: string;
+    signOutBody: string;
+    signOutAction: string;
+    signOutConfirmHeading: string;
+    signOutConfirmBody: string;
   };
   dashboard: {
     eyebrow: string;
@@ -153,6 +158,11 @@ export type Messages = {
     eyebrow: string;
     heading: string;
     introduction: string;
+    syncHeading: string;
+    syncBody: string;
+    syncNow: string;
+    syncing: string;
+    syncSuccess: string;
     exportHeading: string;
     exportBody: string;
     exportJson: string;

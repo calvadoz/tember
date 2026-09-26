@@ -17,8 +17,10 @@ import {
   Database,
   Download,
   Leaf,
+  LogOut,
   Pencil,
   Plus,
+  RefreshCw,
   Scale,
   ShieldCheck,
   Trash2,
@@ -48,6 +50,7 @@ import {
   getSyncStatus,
   pullLatestSync,
   requestSync,
+  signOutOfSync,
   signInToSync,
   syncNow,
 } from "@/lib/sync/client";
@@ -2030,12 +2033,36 @@ function PetList({
   );
 }
 
-function DataView({ onImported }: { onImported: () => void }) {
+function DataView({
+  onImported,
+  onSignedOut,
+  syncEnabled,
+}: {
+  onImported: () => void;
+  onSignedOut: () => void;
+  syncEnabled: boolean;
+}) {
   const petCount = useLiveQuery(() => db.pets.count()) ?? 0;
   const measurements = useLiveQuery(() => db.measurements.toArray()) ?? [];
   const [backup, setBackup] = useState<unknown>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [status, setStatus] = useState("");
+  const [syncing, setSyncing] = useState(false);
+
+  async function syncThisDevice() {
+    setSyncing(true);
+    setStatus("");
+    try {
+      await syncNow();
+      setStatus(messages.data.syncSuccess);
+    } catch {
+      setStatus(messages.sync.syncError);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function exportJson() {
     const value = await makeBackup();
     downloadFile(
@@ -2082,6 +2109,46 @@ function DataView({ onImported }: { onImported: () => void }) {
           </p>
         </header>
         <div className="mt-6 grid gap-5 md:grid-cols-2">
+          {syncEnabled ? (
+            <section className="tember-pet-card rounded-2xl border p-6">
+              <RefreshCw className="size-7 text-secondary" />
+              <h2 className="mt-5 font-display text-xl font-bold text-primary">
+                {messages.data.syncHeading}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {messages.data.syncBody}
+              </p>
+              <Button
+                className="mt-6"
+                disabled={syncing}
+                onClick={syncThisDevice}
+              >
+                <RefreshCw
+                  aria-hidden="true"
+                  className={cn("mr-2 size-4", syncing && "animate-spin")}
+                />
+                {syncing ? messages.data.syncing : messages.data.syncNow}
+              </Button>
+            </section>
+          ) : null}
+          {syncEnabled ? (
+            <section className="tember-pet-card rounded-2xl border p-6">
+              <LogOut className="size-7 text-secondary" />
+              <h2 className="mt-5 font-display text-xl font-bold text-primary">
+                {messages.sync.signOutHeading}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {messages.sync.signOutBody}
+              </p>
+              <Button
+                className="mt-6"
+                onClick={() => setConfirmSignOut(true)}
+                variant="outline"
+              >
+                {messages.sync.signOutAction}
+              </Button>
+            </section>
+          ) : null}
           <section className="tember-pet-card rounded-2xl border p-6">
             <Download className="size-7 text-secondary" />
             <h2 className="mt-5 font-display text-xl font-bold text-primary">
@@ -2173,6 +2240,22 @@ function DataView({ onImported }: { onImported: () => void }) {
             setStatus(messages.data.deleteSuccess);
           }}
           title={messages.data.deleteHeading}
+        />
+      ) : null}
+      {confirmSignOut ? (
+        <Confirm
+          action={messages.sync.signOutAction}
+          body={messages.sync.signOutConfirmBody}
+          onClose={() => setConfirmSignOut(false)}
+          onConfirm={async () => {
+            try {
+              await signOutOfSync();
+              onSignedOut();
+            } catch {
+              setStatus(messages.sync.syncError);
+            }
+          }}
+          title={messages.sync.signOutConfirmHeading}
         />
       ) : null}
     </main>
@@ -2547,6 +2630,14 @@ export function TemberApp() {
             setView("pets");
             setPetId(undefined);
           }}
+          onSignedOut={() => {
+            setInitialSyncComplete(false);
+            setSyncError(undefined);
+            setSyncStatus((status) =>
+              status ? { ...status, authenticated: false } : status,
+            );
+          }}
+          syncEnabled={Boolean(syncStatus?.authenticated)}
         />
       )}
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-2 border-t bg-card/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">

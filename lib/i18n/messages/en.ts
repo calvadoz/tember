@@ -74,6 +74,13 @@ export const en: Messages = {
     syncError:
       "Tember could not sync right now. Your changes remain on this device.",
     syncRetry: "Try syncing again",
+    signOutHeading: "Sign out of this device",
+    signOutBody:
+      "This ends the account session here. Your local records stay on this device.",
+    signOutAction: "Sign out",
+    signOutConfirmHeading: "Sign out of this device?",
+    signOutConfirmBody:
+      "Your local pet records will remain on this device. You can sign in again with the shared account at any time.",
   },
   dashboard: {
     eyebrow: "Your pets",
@@ -183,6 +190,12 @@ export const en: Messages = {
     heading: "Your data",
     introduction:
       "Download a backup or move a Tember backup into this browser.",
+    syncHeading: "Sync this device",
+    syncBody:
+      "Upload the records currently saved here and collect the latest shared changes.",
+    syncNow: "Sync now",
+    syncing: "Syncing…",
+    syncSuccess: "This device is up to date.",
     exportHeading: "Export",
     exportBody:
       "JSON keeps a complete backup. CSV contains measurement rows for spreadsheets.",
