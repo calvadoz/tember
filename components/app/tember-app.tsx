@@ -478,10 +478,10 @@ function MeasurementForm({
   measurement?: Measurement;
   onClose: () => void;
 }) {
-  const [weightUnit, setWeightUnit] = useState<WeightUnit>("g");
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
   const [lengthUnit, setLengthUnit] = useState<LengthUnit>("mm");
   const [weightInput, setWeightInput] = useState(() =>
-    measurement ? String(gramToWeight(measurement.weightGram, "g")) : "",
+    measurement ? String(gramToWeight(measurement.weightGram, "kg")) : "",
   );
   const [dateInput, setDateInput] = useState(
     measurement?.measuredAt ?? today(),

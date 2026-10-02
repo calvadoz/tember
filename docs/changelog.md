@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-02
+
+### Changed
+
+- Defaulted measurement entry and editing to kilograms while retaining gram storage and all existing calculation rules.
+
 ## 2026-09-26
 
 ### Changed
