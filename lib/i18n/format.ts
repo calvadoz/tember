@@ -142,6 +142,24 @@ export function formatWeightChange(
   return `${changeGram > 0 ? "+" : changeGram < 0 ? "−" : ""}${formatted}`;
 }
 
+export function formatWeeklyWeightChange(
+  changeGramPerWeek: number,
+  { locale = defaultLocale }: FormatOptions = {},
+): string {
+  return `${formatWeightChange(changeGramPerWeek, { locale })}/wk`;
+}
+
+export function formatDays(
+  days: number,
+  { locale = defaultLocale }: FormatOptions = {},
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit: "day",
+    unitDisplay: "long",
+  }).format(days);
+}
+
 export function formatLength(
   lengthMm: number,
   unit: "mm" | "cm",
@@ -172,7 +190,10 @@ export function formatAgeYears(
 
 export function formatPetAge(
   years: number,
-  { locale = defaultLocale, approximate = false }: FormatOptions & { approximate?: boolean } = {},
+  {
+    locale = defaultLocale,
+    approximate = false,
+  }: FormatOptions & { approximate?: boolean } = {},
 ): string {
   const months = Math.max(0, Math.round(years * 12));
   const wholeYears = Math.floor(months / 12);

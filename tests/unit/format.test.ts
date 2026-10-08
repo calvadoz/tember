@@ -5,6 +5,7 @@ import {
   formatCalendarDate,
   formatCalendarYear,
   formatChartDate,
+  formatDays,
   formatDateTime,
   formatDisplayWeight,
   formatLength,
@@ -13,6 +14,7 @@ import {
   formatPetAge,
   formatWeight,
   formatWeightChange,
+  formatWeeklyWeightChange,
 } from "@/lib/i18n/format";
 
 describe("localized formatting", () => {
@@ -55,6 +57,8 @@ describe("localized formatting", () => {
     expect(formatDisplayWeight(750)).toContain("750");
     expect(formatDisplayWeight(2_250)).toContain("2.25");
     expect(formatWeightChange(-1_250)).toContain("−1.25");
+    expect(formatWeeklyWeightChange(155.56)).toMatch(/\+156.*\/wk/);
+    expect(formatDays(9)).toContain("9");
   });
 
   it("formats natural pet ages", () => {

@@ -4,9 +4,11 @@ import {
   estimateAgeAtDate,
   isSignificantWeightDrop,
   lengthToMm,
+  measurementIntervalDays,
   significantWeightDropPercent,
   weightChangePercent,
   weightToGram,
+  weeklyWeightChangeGram,
 } from "@/lib/domain";
 import {
   measurementDraftSchema,
@@ -27,6 +29,17 @@ describe("domain rules", () => {
       4.78,
       1,
     );
+  });
+
+  it("normalizes a measurement change to a weekly equivalent", () => {
+    const intervalDays = measurementIntervalDays("2026-09-27", "2026-10-06");
+
+    expect(intervalDays).toBe(9);
+    expect(weeklyWeightChangeGram(2400, 2600, intervalDays)).toBeCloseTo(
+      155.56,
+      2,
+    );
+    expect(weeklyWeightChangeGram(2400, 2600, 0)).toBeUndefined();
   });
 
   it("accepts a measurement with only date and weight", () => {

@@ -127,6 +127,8 @@ export const en: Messages = {
     latestWeight: "Latest weight",
     previousWeight: "Previous weight",
     history: "Measurement history",
+    historyDescription:
+      "Weekly equivalents make changes comparable when records are spaced differently.",
     chart: "Weight over time",
     chartDescription:
       "Explore every recorded weight. Red points mark a drop of 10% or more from the previous record.",
@@ -166,7 +168,9 @@ export const en: Messages = {
     notes: "Notes",
     showDetails: "Show measurement details",
     hideDetails: "Hide measurement details",
-    changeFromPrevious: "Change from previous record",
+    changeFromPrevious: "Since last measurement",
+    weeklyEquivalent: "Weekly equivalent",
+    interval: "Interval",
     noPreviousRecord: "First record",
     deleteHeading: "Delete this measurement?",
     deleteBody: "This removes the measurement from the growth history.",

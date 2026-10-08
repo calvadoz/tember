@@ -28,6 +28,29 @@ export function weightChangeGram(
   return currentWeightGram - previousWeightGram;
 }
 
+const millisecondsPerDay = 1000 * 60 * 60 * 24;
+
+export function measurementIntervalDays(
+  previousMeasuredAt: string,
+  currentMeasuredAt: string,
+): number | undefined {
+  const previous = Date.parse(`${previousMeasuredAt}T00:00:00.000Z`);
+  const current = Date.parse(`${currentMeasuredAt}T00:00:00.000Z`);
+  const difference = Math.round((current - previous) / millisecondsPerDay);
+  return Number.isFinite(difference) && difference > 0 ? difference : undefined;
+}
+
+export function weeklyWeightChangeGram(
+  previousWeightGram: number,
+  currentWeightGram: number,
+  intervalDays: number | undefined,
+): number | undefined {
+  if (!intervalDays || intervalDays <= 0) return undefined;
+  return (
+    (weightChangeGram(previousWeightGram, currentWeightGram) * 7) / intervalDays
+  );
+}
+
 export function weightChangeTone(
   previousWeightGram: number,
   currentWeightGram: number,

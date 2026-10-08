@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-09
+
+### Changed
+
+- Replaced the misleading percentage-only mobile history summary with a weight-per-week equivalent. Expanded and desktop records retain the exact change, percentage, and elapsed interval.
+- Shortened the journal comparison label to “Since last measurement”.
+
 ## 2026-10-02
 
 ### Changed

@@ -104,6 +104,7 @@ export type Messages = {
     latestWeight: string;
     previousWeight: string;
     history: string;
+    historyDescription: string;
     chart: string;
     chartDescription: string;
     chartLegendRecorded: string;
@@ -136,6 +137,8 @@ export type Messages = {
     showDetails: string;
     hideDetails: string;
     changeFromPrevious: string;
+    weeklyEquivalent: string;
+    interval: string;
     noPreviousRecord: string;
     deleteHeading: string;
     deleteBody: string;

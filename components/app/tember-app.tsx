@@ -68,6 +68,7 @@ import type {
   WeightUnit,
 } from "@/lib/domain";
 import {
+  measurementIntervalDays,
   gramToWeight,
   estimateAgeAtDate,
   isSignificantWeightDrop,
@@ -77,6 +78,7 @@ import {
   weightChangeGram,
   weightChangePercent,
   weightChangeTone,
+  weeklyWeightChangeGram,
   weightToGram,
 } from "@/lib/domain";
 import {
@@ -91,12 +93,14 @@ import {
   formatCalendarDate,
   formatCalendarYear,
   formatChartDate,
+  formatDays,
   formatLength,
   formatMeasurementListDate,
   formatNumber,
   formatPetAge,
   formatWeight,
   formatWeightChange,
+  formatWeeklyWeightChange,
 } from "@/lib/i18n/format";
 import { getMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -248,6 +252,42 @@ function WeightChange({
         })}
         )
       </span>
+    </span>
+  );
+}
+
+function WeeklyWeightChange({
+  changeGramPerWeek,
+  significantDrop = false,
+  compact = false,
+}: {
+  changeGramPerWeek?: number;
+  significantDrop?: boolean;
+  compact?: boolean;
+}) {
+  if (changeGramPerWeek === undefined) {
+    return (
+      <span className="text-xs font-medium text-muted-foreground">
+        {messages.common.notRecordedShort}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "font-semibold tabular-nums",
+        compact ? "text-xs" : "text-sm",
+        significantDrop
+          ? "text-red-700"
+          : changeGramPerWeek > 0
+            ? "text-emerald-700"
+            : changeGramPerWeek < 0
+              ? "text-amber-800"
+              : "text-muted-foreground",
+      )}
+    >
+      {formatWeeklyWeightChange(changeGramPerWeek)}
     </span>
   );
 }
@@ -1350,14 +1390,30 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
   );
   const changesByMeasurementId = new Map<
     string,
-    { previousWeightGram: number; percent: number; significantDrop: boolean }
+    {
+      previousWeightGram: number;
+      percent: number;
+      intervalDays?: number;
+      weeklyChangeGram?: number;
+      significantDrop: boolean;
+    }
   >();
   chronological.forEach((measurement, index) => {
     const previous = chronological[index - 1];
     if (!previous) return;
+    const intervalDays = measurementIntervalDays(
+      previous.measuredAt,
+      measurement.measuredAt,
+    );
     changesByMeasurementId.set(measurement.id, {
       previousWeightGram: previous.weightGram,
       percent: weightChangePercent(previous.weightGram, measurement.weightGram),
+      intervalDays,
+      weeklyChangeGram: weeklyWeightChangeGram(
+        previous.weightGram,
+        measurement.weightGram,
+        intervalDays,
+      ),
       significantDrop: isSignificantWeightDrop(
         previous.weightGram,
         measurement.weightGram,
@@ -1560,6 +1616,9 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
               <h2 className="font-display text-xl font-bold text-primary">
                 {messages.pet.history}
               </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {messages.pet.historyDescription}
+              </p>
             </div>
             <div className="md:hidden">
               {measurementGroups.map((group) => (
@@ -1590,7 +1649,7 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                         <article key={item.id}>
                           <button
                             aria-expanded={expanded}
-                            className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto_3.75rem_1.25rem] items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                            className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto_5.5rem_1.25rem] items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                             onClick={() =>
                               setExpandedMeasurementId(
                                 expanded ? undefined : item.id,
@@ -1613,17 +1672,12 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                               )}
                             >
                               <span className="sr-only">
-                                {messages.measurement.changeFromPrevious}
+                                {messages.measurement.weeklyEquivalent}
                               </span>
-                              <span>
-                                {change
-                                  ? formatNumber(change.percent / 100, {
-                                      maximumFractionDigits: 1,
-                                      signDisplay: "always",
-                                      style: "percent",
-                                    })
-                                  : messages.common.notRecordedShort}
-                              </span>
+                              <WeeklyWeightChange
+                                changeGramPerWeek={change?.weeklyChangeGram}
+                                significantDrop={change?.significantDrop}
+                              />
                             </span>
                             <span className="sr-only">
                               {expanded
@@ -1676,6 +1730,33 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                                       weightGram={item.weightGram}
                                     />
                                   </div>
+                                  <dl className="mt-3 grid grid-cols-2 gap-3 border-t pt-3">
+                                    <div>
+                                      <dt className="text-xs text-muted-foreground">
+                                        {messages.measurement.weeklyEquivalent}
+                                      </dt>
+                                      <dd className="mt-1">
+                                        <WeeklyWeightChange
+                                          changeGramPerWeek={
+                                            change.weeklyChangeGram
+                                          }
+                                          significantDrop={
+                                            change.significantDrop
+                                          }
+                                        />
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-xs text-muted-foreground">
+                                        {messages.measurement.interval}
+                                      </dt>
+                                      <dd className="mt-1 text-sm font-medium">
+                                        {change.intervalDays === undefined
+                                          ? messages.common.notRecordedShort
+                                          : formatDays(change.intervalDays)}
+                                      </dd>
+                                    </div>
+                                  </dl>
                                 </div>
                               ) : null}
 
@@ -1724,7 +1805,7 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                     <th className="px-5 py-3">{messages.measurement.date}</th>
                     <th className="px-5 py-3">{messages.measurement.weight}</th>
                     <th className="px-5 py-3">
-                      {messages.measurement.changeFromPrevious}
+                      {messages.measurement.weeklyEquivalent}
                     </th>
                     <th className="px-5 py-3">
                       {messages.measurement.shellLength}
@@ -1759,11 +1840,23 @@ function PetDetail({ petId, onBack }: { petId: string; onBack: () => void }) {
                         </td>
                         <td className="px-5 py-4">
                           {change ? (
-                            <WeightChange
-                              compact
-                              previousWeightGram={change.previousWeightGram}
-                              weightGram={item.weightGram}
-                            />
+                            <div className="grid gap-1">
+                              <WeeklyWeightChange
+                                compact
+                                changeGramPerWeek={change.weeklyChangeGram}
+                                significantDrop={change.significantDrop}
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                <WeightChange
+                                  compact
+                                  previousWeightGram={change.previousWeightGram}
+                                  weightGram={item.weightGram}
+                                />
+                                {change.intervalDays === undefined
+                                  ? null
+                                  : ` · ${formatDays(change.intervalDays)}`}
+                              </span>
+                            </div>
                           ) : (
                             <span className="text-muted-foreground">
                               {messages.common.notRecordedShort}
