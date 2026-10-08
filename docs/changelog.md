@@ -2,8 +2,14 @@
 
 ## 2026-10-09
 
+### Added
+
+- Added a documentation-first project blueprint covering product requirements, technical architecture, application flow, design, data and sync contracts, and the proposed polish-and-reliability delivery plan.
+- Added six presentable SVG visual briefs that accompany the editable project-blueprint documents.
+
 ### Changed
 
+- Refined the project-blueprint visual briefs with centred flow and timeline labels, wrapped schema text, safer text bounds, and more space around responsive-diagram elements.
 - Replaced the misleading percentage-only mobile history summary with a weight-per-week equivalent. Expanded and desktop records retain the exact change, percentage, and elapsed interval.
 - Shortened the journal comparison label to “Since last measurement”.
 
